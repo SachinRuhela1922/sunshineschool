@@ -1083,6 +1083,31 @@
             color: #b09a7e;
             margin-top: 0.4rem;
         }
+        /* ===== MULTI-MONTH CHIPS ===== */
+        .month-group { grid-column: 1 / -1; }
+        .month-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .month-chip { position: relative; cursor: pointer; user-select: none; }
+        .month-chip input { position: absolute; opacity: 0; pointer-events: none; }
+        .month-chip span {
+            display: inline-block; padding: 7px 14px; border-radius: 30px;
+            border: 1.5px solid #d9c9ad; background: #fffdf8; color: #5b4a30;
+            font-size: 13px; font-weight: 600; transition: all .15s ease;
+        }
+        .month-chip:hover span { border-color: #b5651d; }
+        .month-chip input:checked + span {
+            background: #b5651d; border-color: #b5651d; color: #fff;
+            box-shadow: 0 2px 6px rgba(181,101,29,.35);
+        }
+        .month-chip.billed span { border-style: dashed; }
+        .month-chip.billed input:checked + span { background: #6b8e4e; border-color: #6b8e4e; }
+        .month-charge-info {
+            margin-top: 10px; padding: 9px 13px; border-radius: 10px;
+            background: #fbf3e4; color: #5b4a30; font-size: 13px; line-height: 1.5;
+        }
+        .month-charge-info b { color: #b5651d; }
+        .month-charge-info .warn { color: #8a5a00; display: block; margin-top: 2px; }
+        .force-charge { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: #7a6a52; cursor: pointer; }
+        .force-charge input { width: auto; margin: 0; }
     </style>
 </head>
 
@@ -1198,22 +1223,18 @@
                 <form id="paymentForm">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label><i class="fas fa-money-bill"></i> Monthly Fee</label>
+                            <label><i class="fas fa-money-bill"></i> Monthly Fee (per month)</label>
                             <input type="number" id="monthlyFee" required min="0" placeholder="Enter monthly fee">
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-rupee-sign"></i> Amount Paid</label>
                             <input type="number" id="amount" required min="0" placeholder="Enter amount paid">
                         </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar-alt"></i> Month</label>
-                            <select id="month" required>
-                                <option value="">Select Month</option>
-                                <option>January</option><option>February</option><option>March</option>
-                                <option>April</option><option>May</option><option>June</option>
-                                <option>July</option><option>August</option><option>September</option>
-                                <option>October</option><option>November</option><option>December</option>
-                            </select>
+                        <div class="form-group month-group">
+                            <label><i class="fas fa-calendar-alt"></i> Month(s) <small style="font-weight:400;color:#9a8868;">— ek ya ek se zyada (jaise Nov + Jan)</small></label>
+                            <div class="month-chips" id="monthChips"></div>
+                            <div class="month-charge-info" id="monthChargeInfo"></div>
+                            <label class="force-charge"><input type="checkbox" id="forceCharge"> Pehle se bill ho chuke months ko bhi dobara charge karo</label>
                         </div>
                         <div class="form-group">
     <label><i class="fas fa-calendar-day"></i> Payment Date</label>
@@ -1421,29 +1442,26 @@
 
         <div class="edit-modal-body">
             <div class="edit-note">
-                Is transaction ki saari details badal sakte hain. Agar is month ki Monthly Fee pehle hi
-                kisi aur transaction me charge ho chuki hai to yahan Monthly Fee <b>0</b> rakhein,
-                warna wo dobara add ho jayegi. Save karne par Due automatically dobara calculate hoga.
+                Is transaction ki saari details badal sakte hain. Monthly Fee <b>per month</b> ki daalein aur
+                jitne months chahiye select karein (jaise Nov + Jan). Jo month pehle kisi transaction me
+                bill ho chuka hai wo automatically dobara charge nahi hoga. Save karne par Due automatically
+                dobara calculate hoga.
             </div>
 
             <div class="form-grid">
                 <div class="form-group">
-                    <label><i class="fas fa-money-bill"></i> Monthly Fee</label>
+                    <label><i class="fas fa-money-bill"></i> Monthly Fee (per month)</label>
                     <input type="number" id="edit_monthlyFee" min="0">
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-rupee-sign"></i> Amount Paid</label>
                     <input type="number" id="edit_amount" min="0">
                 </div>
-                <div class="form-group">
-                    <label><i class="fas fa-calendar-alt"></i> Month</label>
-                    <select id="edit_month">
-                        <option value="">Select Month</option>
-                        <option>January</option><option>February</option><option>March</option>
-                        <option>April</option><option>May</option><option>June</option>
-                        <option>July</option><option>August</option><option>September</option>
-                        <option>October</option><option>November</option><option>December</option>
-                    </select>
+                <div class="form-group month-group">
+                    <label><i class="fas fa-calendar-alt"></i> Month(s)</label>
+                    <div class="month-chips" id="edit_monthChips"></div>
+                    <div class="month-charge-info" id="edit_monthChargeInfo"></div>
+                    <label class="force-charge"><input type="checkbox" id="edit_forceCharge"> Pehle se bill ho chuke months ko bhi dobara charge karo</label>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-calendar-day"></i> Payment Date</label>
@@ -1570,6 +1588,129 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
         shirtPantBalance: "👕 Shirt/Pant",
         rteFee: "🆔 RTE Exam Fee"
     };
+
+
+    // ==========================================================
+    // MULTI-MONTH HELPERS
+    // One transaction may cover several months (Nov + Jan ...).
+    // Months are always shown in school-year order (Apr -> Mar).
+    // Old records that only have `month` keep working.
+    // ==========================================================
+
+    const MONTH_ORDER = ["April","May","June","July","August","September",
+                         "October","November","December","January","February","March"];
+
+    const MONTH_SHORT = { April:"Apr", May:"May", June:"Jun", July:"Jul", August:"Aug",
+                          September:"Sep", October:"Oct", November:"Nov", December:"Dec",
+                          January:"Jan", February:"Feb", March:"Mar" };
+
+    function sortMonths(arr) {
+        const known = arr.filter(m => MONTH_ORDER.includes(m))
+                         .sort((a, b) => MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+        const unknown = arr.filter(m => !MONTH_ORDER.includes(m));
+        return [...known, ...unknown];
+    }
+
+    function parsePaymentMonths(payment) {
+        if (Array.isArray(payment.months) && payment.months.length) {
+            return sortMonths([...new Set(payment.months)]);
+        }
+        const raw = String(payment.month || "").split(/[+,&]/).map(s => s.trim()).filter(Boolean);
+        return raw.length ? sortMonths([...new Set(raw)]) : [];
+    }
+
+    function monthsLabel(months) {
+        return months && months.length ? months.join(" + ") : "-";
+    }
+
+    function monthsShortLabel(months) {
+        if (!months || !months.length) return "-";
+        if (months.length === 1) return months[0];
+        return months.map(m => MONTH_SHORT[m] || m).join(" + ");
+    }
+
+    // compact version for tight PDF table cells
+    function monthsCompactLabel(months) {
+        if (!months || !months.length) return "-";
+        const sh = m => MONTH_SHORT[m] || m;
+        if (months.length === 1) return sh(months[0]);
+        if (months.length <= 3) return months.map(sh).join("+");
+        return `${sh(months[0])}..${sh(months[months.length - 1])}(${months.length})`;
+    }
+
+    // School session (April -> March) a date belongs to. The same month
+    // name in a NEW session is a new charge, not "already billed".
+    function sessionOf(dateLike) {
+        const d = dateLike ? new Date(dateLike) : new Date();
+        const dd = isNaN(d.getTime()) ? new Date() : d;
+        return dd.getMonth() >= 3 ? dd.getFullYear() : dd.getFullYear() - 1;
+    }
+
+    // month -> fee already billed (key = "session|Month"), for the whole
+    // history and for the edit modal (only payments before the edited one)
+    let billedMonthsAll = {};
+    let editBilledKeys = {};
+
+    function getSelectedMonths(containerId) {
+        return sortMonths(
+            [...document.querySelectorAll(`#${containerId} input:checked`)].map(i => i.value)
+        );
+    }
+
+    function setSelectedMonths(containerId, months) {
+        document.querySelectorAll(`#${containerId} input`).forEach(i => {
+            i.checked = months.includes(i.value);
+        });
+    }
+
+    function renderMonthChips(containerId, isBilledFn, onChange) {
+        const box = document.getElementById(containerId);
+        if (!box) return;
+        const selected = getSelectedMonths(containerId);
+        box.innerHTML = MONTH_ORDER.map(m => {
+            const billed = isBilledFn(m);
+            return `<label class="month-chip${billed ? " billed" : ""}" title="${billed ? m + " — fee already billed" : m}">
+                        <input type="checkbox" value="${m}" ${selected.includes(m) ? "checked" : ""}>
+                        <span>${MONTH_SHORT[m]}${billed ? " ✓" : ""}</span>
+                    </label>`;
+        }).join("");
+        box.querySelectorAll("input").forEach(i => i.addEventListener("change", onChange));
+    }
+
+    // Re-draws chips + the "what will be charged" line and returns the
+    // numbers the submit / save code needs.
+    function updateMonthUI(ctx) {
+        const p = ctx === "edit" ? "edit_" : "";
+        const billed = ctx === "edit" ? editBilledKeys : billedMonthsAll;
+        const dateEl = document.getElementById(p + "paymentDate");
+        const iso = dateEl ? convertToISODate(dateEl.value) : null;
+        const session = sessionOf(iso);
+        const isBilled = m => billed[session + "|" + m] !== undefined;
+
+        renderMonthChips(p + "monthChips", isBilled, () => updateMonthUI(ctx));
+
+        const selected = getSelectedMonths(p + "monthChips");
+        const perMonth = Number(document.getElementById(p + "monthlyFee").value) || 0;
+        const force = document.getElementById(p + "forceCharge").checked;
+        const chargeable = selected.filter(m => force || !isBilled(m));
+        const skipped = selected.filter(m => !chargeable.includes(m));
+        const total = perMonth * chargeable.length;
+
+        const info = document.getElementById(p + "monthChargeInfo");
+        if (!selected.length) {
+            info.innerHTML = "Kam se kam ek month select karein.";
+        } else {
+            let html = chargeable.length
+                ? `<b>${chargeable.length}</b> month${chargeable.length > 1 ? "s" : ""} × ₹${perMonth} = <b>₹${total}</b> tuition fee is transaction me charge hogi (${chargeable.map(m => MONTH_SHORT[m]).join(" + ")}).`
+                : `Is transaction me <b>koi naya tuition charge nahi</b> lagega.`;
+            if (skipped.length) {
+                html += `<span class="warn">${skipped.map(m => MONTH_SHORT[m]).join(", ")} ki fee pehle hi bill ho chuki hai — dobara charge nahi hogi.</span>`;
+            }
+            info.innerHTML = html;
+        }
+
+        return { selected, chargeable, skipped, perMonth, total, session };
+    }
 
     // ==========================================
     // LOAD STUDENT
@@ -1824,16 +1965,62 @@ async function loadPayments() {
                 payment.additionalFees || {};
 
 
-            // remember the month's real fee the first time it's seen
-            if (monthlyFee > 0 && !monthlyFeeByMonth[payment.month]) {
-                monthlyFeeByMonth[payment.month] = monthlyFee;
+            // ======================================================
+            // MULTI-MONTH BILLING
+            //
+            // A transaction may cover several months. Its stored
+            // monthlyFee is the TOTAL tuition charged on this slip.
+            // Months already billed earlier (same school session) are
+            // never charged again; they are only shown for reference.
+            // ======================================================
+
+            const sess = sessionOf(payment.paymentDate);
+
+            const paymentMonths = parsePaymentMonths(payment);
+
+            let chargedMonths = [];
+            let perMonthCharge = 0;
+
+            if (monthlyFee > 0) {
+
+                chargedMonths = paymentMonths.filter(
+                    m => monthlyFeeByMonth[sess + "|" + m] === undefined
+                );
+
+                // fee entered on a month that was already billed
+                // (legacy / forced re-charge): still counts as charged
+                if (!chargedMonths.length) {
+                    chargedMonths = paymentMonths.slice();
+                }
+
+                perMonthCharge = Math.round((monthlyFee / Math.max(chargedMonths.length, 1)) * 100) / 100;
+
+                chargedMonths.forEach(m => {
+                    const k = sess + "|" + m;
+                    if (monthlyFeeByMonth[k] === undefined) {
+                        monthlyFeeByMonth[k] = perMonthCharge;
+                    }
+                });
             }
 
+            const monthBreakdown = paymentMonths.map(m => {
+                const chargedNow = chargedMonths.includes(m);
+                return {
+                    month: m,
+                    chargedNow,
+                    fee: chargedNow
+                        ? perMonthCharge
+                        : (Number(monthlyFeeByMonth[sess + "|" + m]) || 0)
+                };
+            });
+
+            const chargedKeys = {};
+            chargedMonths.forEach(m => { chargedKeys[sess + "|" + m] = perMonthCharge; });
+
             // what to DISPLAY for this transaction's monthly fee
+            // (sum of every month it covers, billed now or earlier)
             const displayMonthlyFee =
-                monthlyFee > 0
-                    ? monthlyFee
-                    : (monthlyFeeByMonth[payment.month] || 0);
+                Math.round(monthBreakdown.reduce((s, b) => s + b.fee, 0) * 100) / 100;
 
 
             // ======================================================
@@ -1948,6 +2135,24 @@ async function loadPayments() {
                 _displayMonthlyFee:
                     displayMonthlyFee,
 
+                _months:
+                    paymentMonths,
+
+                _chargedMonths:
+                    chargedMonths,
+
+                _perMonthFee:
+                    perMonthCharge ||
+                    (paymentMonths.length
+                        ? Math.round((displayMonthlyFee / paymentMonths.length) * 100) / 100
+                        : 0),
+
+                _monthBreakdown:
+                    monthBreakdown,
+
+                _chargedKeys:
+                    chargedKeys,
+
                 _calculatedPaid:
                     paid,
 
@@ -1976,6 +2181,10 @@ async function loadPayments() {
         // ==========================================================
 
         currentPayments = calculatedPayments;
+
+        // months already billed -> drives the chips in the Submit form
+        billedMonthsAll = { ...monthlyFeeByMonth };
+        updateMonthUI("main");
 
 
         // ==========================================================
@@ -2084,8 +2293,14 @@ async function loadPayments() {
                         ? _d.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
                         : "";
 
+                    const monthText = monthsLabel(payment._months);
+                    const monthTitle = (payment._monthBreakdown || [])
+                        .map(b => `${b.month}: ₹${b.fee}${b.chargedNow ? "" : " (billed earlier)"}`)
+                        .join(" | ");
+
                     const searchText = [
-                        payment.month,
+                        monthText,
+                        (payment._months || []).map(m => MONTH_SHORT[m] || m).join(" "),
                         _dateNum,
                         _dateLong,
                         payment.paymentMode,
@@ -2103,11 +2318,14 @@ async function loadPayments() {
 
                             <td>
                                 <strong>
-                                    ${payment.month || "-"}
+                                    ${monthText}
                                 </strong>
+                                ${(payment._months || []).length > 1
+                                    ? `<div style="font-size:11px;color:#9a8868;">${payment._months.length} months</div>`
+                                    : ""}
                             </td>
 
-                            <td>
+                            <td title="${monthTitle}">
                                 ₹${monthlyFee}
                             </td>
 
@@ -2342,16 +2560,29 @@ function buildInvoiceData(payment) {
         status = paid > 0 ? "Partial" : "Due";
     }
 
+    const monthsArr = payment._months || parsePaymentMonths(payment);
+
+    const monthBreakdown = payment._monthBreakdown ||
+        monthsArr.map(m => ({
+            month: m,
+            chargedNow: monthlyFeeChargedThisSlip,
+            fee: monthsArr.length ? displayMonthlyFee / monthsArr.length : 0
+        }));
+
     const invoiceNo =
         "INV-" +
         (studentData.studentId || "STU") +
         "-" +
-        (payment.month || "").slice(0, 3).toUpperCase() +
+        (monthsArr.map(m => m.slice(0, 3).toUpperCase()).join("-") || "MON") +
         "-" +
         (payment._id ? String(payment._id).slice(-5).toUpperCase() : Date.now().toString().slice(-5));
 
     return {
-        month: payment.month || "-",
+        month: monthsLabel(monthsArr),
+        monthShort: monthsShortLabel(monthsArr),
+        monthCompact: monthsCompactLabel(monthsArr),
+        months: monthsArr,
+        monthBreakdown,
         paymentMode: payment.paymentMode || "-",
         transactionId: payment.transactionId || "-",
         paid,
@@ -2399,6 +2630,17 @@ function generateWhatsAppMessage(student, payment) {
         extraText += `   ${emojiLabel}: ₹${f.value}\n`;
     });
 
+    // multi-month: show how the monthly fee splits across months
+    let monthFeeDetail = "";
+    if (info.monthBreakdown.length > 1) {
+        monthFeeDetail =
+            "\n      (" +
+            info.monthBreakdown
+                .map(b => `${MONTH_SHORT[b.month] || b.month} ₹${b.fee}${b.chargedNow ? "" : " ✔ earlier"}`)
+                .join(" + ") +
+            ")";
+    }
+
     let status = "✅ Fully Paid";
     let statusEmoji = "✅";
 
@@ -2415,8 +2657,8 @@ function generateWhatsAppMessage(student, payment) {
 📚 *Class:* ${student.academic?.class || '-'} ${student.academic?.section || ''}
 👨 *Father:* ${student.father?.name || student.fatherName || '-'}
 
-📅 *Month:* ${info.month}
-💰 *Monthly Fee:* ₹${info.monthlyFee}
+📅 *Month${info.months.length > 1 ? "s" : ""}:* ${info.month}
+💰 *Monthly Fee:* ₹${info.monthlyFee}${monthFeeDetail}
 
 ${extraText ? `📋 *New Additional Fees (this slip):*\n${extraText}` : '📋 *New Additional Fees:* None'}
 
@@ -2543,6 +2785,9 @@ function showToast(message) {
 
     function renderEmptyPayments() {
 
+        billedMonthsAll = {};
+        updateMonthUI("main");
+
         currentPayments = [];
 
         document.getElementById("paymentTable").innerHTML = `
@@ -2592,12 +2837,18 @@ function showToast(message) {
                 // GET FORM VALUES
                 // ==========================================
 
-                const monthlyFee =
+                // "Monthly Fee" input = fee PER MONTH.
+                // Total charged = per-month fee x months not yet billed.
+                const perMonthFeeInput =
                     Number(
                         document.getElementById(
                             "monthlyFee"
                         ).value
                     ) || 0;
+
+                const monthCalc = updateMonthUI("main");
+
+                const monthlyFee = monthCalc.total;
 
 
                 const amount =
@@ -2608,10 +2859,9 @@ function showToast(message) {
                     ) || 0;
 
 
-                const month =
-                    document.getElementById(
-                        "month"
-                    ).value;
+                const selectedMonths = monthCalc.selected;
+
+                const month = monthsLabel(selectedMonths);
 
 
                 const paymentDate =
@@ -2636,7 +2886,7 @@ function showToast(message) {
                 // VALIDATION
                 // ==========================================
 
-                if (monthlyFee < 0) {
+                if (perMonthFeeInput < 0) {
 
                     alert(
                         "Monthly fee cannot be negative."
@@ -2656,10 +2906,10 @@ function showToast(message) {
                 }
 
 
-                if (!month) {
+                if (!selectedMonths.length) {
 
                     alert(
-                        "Please select a month."
+                        "Please select at least one month."
                     );
 
                     return;
@@ -2705,7 +2955,8 @@ if (!isoPaymentDate) {
     amount: amount,
 
     // Month & Payment
-    month: document.getElementById("month").value,
+    month: month,
+    months: selectedMonths,
     paymentDate: convertToISODate(document.getElementById("paymentDate").value),
     paymentMode: document.getElementById("paymentMode").value,
     transactionId: document.getElementById("transactionId").value,
@@ -2894,6 +3145,9 @@ if (!isoPaymentDate) {
 
                     document.getElementById("paymentDate").value = getTodayFormatted();
 
+                    // chips were cleared by reset() -> redraw
+                    updateMonthUI("main");
+
 
                 } catch (error) {
 
@@ -2930,6 +3184,12 @@ if (!isoPaymentDate) {
     // ==========================================
 
     document.getElementById("paymentDate").value = getTodayFormatted();
+
+    // month chips / charge preview (main form)
+    ["monthlyFee", "paymentDate"].forEach(id =>
+        document.getElementById(id).addEventListener("input", () => updateMonthUI("main")));
+    document.getElementById("forceCharge").addEventListener("change", () => updateMonthUI("main"));
+    updateMonthUI("main");
 
 
     // ==========================================
@@ -2980,14 +3240,22 @@ if (!isoPaymentDate) {
         // follow-up payment against an earlier balance.
         const itemRowsList = [
             ...(monthlyFeeChargedThisSlip
-                ? [`<tr><td>Monthly Tuition Fee (${payment.month || "-"})</td><td>₹${monthlyFeeChargedThisSlip ? info.monthlyFeeChargeAmount : 0}</td></tr>`]
+                ? info.monthBreakdown
+                    .filter(b => b.chargedNow)
+                    .map(b => `<tr><td>Monthly Tuition Fee (${b.month})</td><td>₹${b.fee}</td></tr>`)
                 : []),
             ...extraFees.map(f => `<tr><td>${f.label}</td><td>₹${f.value}</td></tr>`)
         ];
 
-        const itemRows = itemRowsList.length
-            ? itemRowsList.join("")
-            : `<tr><td colspan="2" style="text-align:center;color:#b09a7e;">No new charges this transaction — payment applied to previous balance</td></tr>`;
+        const billedEarlier = info.monthBreakdown.filter(b => !b.chargedNow).map(b => b.month);
+
+        const itemRows =
+            (itemRowsList.length
+                ? itemRowsList.join("")
+                : `<tr><td colspan="2" style="text-align:center;color:#b09a7e;">No new charges this transaction — payment applied to previous balance</td></tr>`)
+            + (billedEarlier.length && info.months.length > 1
+                ? `<tr><td colspan="2" style="font-style:italic;color:#9a8868;font-size:12px;">${billedEarlier.join(", ")} fee was already billed on an earlier slip</td></tr>`
+                : "");
 
         document.getElementById("invoiceContent").innerHTML = `
             <div class="invoice-brand">
@@ -2996,7 +3264,7 @@ if (!isoPaymentDate) {
                     <p>Fee Payment Invoice · est. 2006</p>
                 </div>
                 <div class="invoice-tag">
-                    <div class="tag-title">${payment.month || "-"}</div>
+                    <div class="tag-title">${info.monthShort}</div>
                     <div class="tag-sub">${invoiceNo}</div>
                 </div>
             </div>
@@ -3015,8 +3283,8 @@ if (!isoPaymentDate) {
 
             <div class="invoice-section-title">Payment Details</div>
             <div class="invoice-grid">
-                <div class="invoice-row"><span class="label">Month</span><span class="value">${payment.month || "-"}</span></div>
-                <div class="invoice-row"><span class="label">Monthly Fee (this month)</span><span class="value">₹${monthlyFee}</span></div>
+                <div class="invoice-row"><span class="label">Month${info.months.length > 1 ? "s" : ""}</span><span class="value">${info.month}</span></div>
+                <div class="invoice-row"><span class="label">Monthly Fee (${info.months.length > 1 ? info.months.length + " months" : "this month"})</span><span class="value">₹${monthlyFee}</span></div>
                 <div class="invoice-row"><span class="label">Payment Date</span><span class="value">${date}</span></div>
                 <div class="invoice-row"><span class="label">Payment Mode</span><span class="value">${payment.paymentMode || "-"}</span></div>
                 <div class="invoice-row"><span class="label">RTE Exam Fee</span><span class="value">${payment.transactionId || "-"}</span></div>
@@ -3368,8 +3636,8 @@ function sendWhatsAppFromInvoice() {
         );
 
         detailRow(
-            "Month:",
-            info.month,
+            info.months.length > 1 ? "Months:" : "Month:",
+            info.monthShort,
             col2LabelX,
             col2ValueX,
             y
@@ -3479,7 +3747,12 @@ function sendWhatsAppFromInvoice() {
         // the parent what the month's fee actually is — even on a
         // pure follow-up payment slip.
         const feeItems = [
-            { label: `Monthly Tuition Fee (${info.month})`, value: info.monthlyFee },
+            ...(info.monthBreakdown.length > 1
+                ? info.monthBreakdown.map(b => ({
+                    label: `Tuition Fee (${b.month})${b.chargedNow ? "" : " - billed earlier"}`,
+                    value: b.fee
+                  }))
+                : [{ label: `Monthly Tuition Fee (${info.month})`, value: info.monthlyFee }]),
             ...info.extraFees
         ];
 
@@ -3725,7 +3998,7 @@ function sendWhatsAppFromInvoice() {
             (studentData.studentName || "Student")
                 .replace(/\s+/g, "_") +
             "_" +
-            (info.month || "Month") +
+            (info.monthShort || "Month").replace(/[\s+]+/g, "_") +
             ".pdf";
 
         doc.save(fileName);
@@ -3834,6 +4107,10 @@ function sendWhatsAppFromInvoice() {
         this.value = formatted;
     });
 
+    ["edit_monthlyFee", "edit_paymentDate"].forEach(id =>
+        document.getElementById(id).addEventListener("input", () => updateMonthUI("edit")));
+    document.getElementById("edit_forceCharge").addEventListener("change", () => updateMonthUI("edit"));
+
     function openEditPayment(index) {
 
         const payment = currentPayments[index];
@@ -3842,9 +4119,7 @@ function sendWhatsAppFromInvoice() {
         editingPaymentId = payment._id;
 
         // raw values stored in DB (NOT the inherited display fee)
-        document.getElementById("edit_monthlyFee").value = Number(payment.monthlyFee) || 0;
         document.getElementById("edit_amount").value = Number(payment.amount) || 0;
-        document.getElementById("edit_month").value = payment.month || "";
         document.getElementById("edit_paymentMode").value = payment.paymentMode || "Cash";
         document.getElementById("edit_transactionId").value = payment.transactionId || "";
 
@@ -3862,6 +4137,19 @@ function sendWhatsAppFromInvoice() {
             document.getElementById("edit_" + key).value = Number(fees[key]) || 0;
         });
 
+        // edit modal shows the fee PER MONTH, and only treats months billed
+        // by EARLIER transactions as "already billed"
+        document.getElementById("edit_monthlyFee").value = Number(payment._perMonthFee) || 0;
+        document.getElementById("edit_forceCharge").checked = false;
+
+        editBilledKeys = {};
+        currentPayments.slice(0, index).forEach(p => Object.assign(editBilledKeys, p._chargedKeys || {}));
+
+        // draw chips first, then tick this payment's months
+        renderMonthChips("edit_monthChips", () => false, () => {});
+        setSelectedMonths("edit_monthChips", payment._months || parsePaymentMonths(payment));
+        updateMonthUI("edit");
+
         document.getElementById("editOverlay").classList.add("active");
     }
 
@@ -3878,18 +4166,21 @@ function sendWhatsAppFromInvoice() {
 
         if (!editingPaymentId) return;
 
-        const monthlyFee = Number(document.getElementById("edit_monthlyFee").value) || 0;
+        const perMonthFeeInput = Number(document.getElementById("edit_monthlyFee").value) || 0;
         const amount = Number(document.getElementById("edit_amount").value) || 0;
-        const month = document.getElementById("edit_month").value;
+        const monthCalc = updateMonthUI("edit");
+        const monthlyFee = monthCalc.total;
+        const selectedMonths = monthCalc.selected;
+        const month = monthsLabel(selectedMonths);
         const isoDate = convertToISODate(document.getElementById("edit_paymentDate").value);
 
-        if (monthlyFee < 0 || amount < 0) {
+        if (perMonthFeeInput < 0 || amount < 0) {
             alert("Fee / amount cannot be negative.");
             return;
         }
 
-        if (!month) {
-            alert("Please select a month.");
+        if (!selectedMonths.length) {
+            alert("Please select at least one month.");
             return;
         }
 
@@ -3907,6 +4198,7 @@ function sendWhatsAppFromInvoice() {
             monthlyFee,
             amount,
             month,
+            months: selectedMonths,
             paymentDate: isoDate,
             paymentMode: document.getElementById("edit_paymentMode").value,
             transactionId: document.getElementById("edit_transactionId").value,
@@ -4199,7 +4491,7 @@ function sendWhatsAppFromInvoice() {
 
                 doc.text(String(idx + 1), cellX(0), ty, { align: "center" });
                 doc.text(fmtDate(x.p.paymentDate), cellX(1), ty);
-                doc.text(info.month, cellX(2), ty);
+                doc.text(info.monthCompact, cellX(2), ty);
                 doc.text(rs(info.monthlyFee) + (info.monthlyFeeChargedThisSlip ? "" : "*"), cellX(3), ty, { align: "right" });
                 doc.text(rs(info.previousDue), cellX(4), ty, { align: "right" });
                 doc.text(extraLines, cellX(5), ty);
