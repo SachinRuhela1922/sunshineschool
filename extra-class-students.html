@@ -775,10 +775,10 @@
             <button class="btn-action btn-success" onclick="exportCSV()">
                 <i class="fas fa-file-csv"></i> Export CSV
             </button>
-            <button class="btn-action btn-info" onclick="downloadAllResultsPDF()" title="Downloads every student's result card (marks) as one PDF">
+            <button class="btn-action btn-info" onclick="downloadAllResultsPDF()" title="Downloads every student's result card (marks) as one PDF (A-Z)">
                 <i class="fas fa-file-pdf"></i> All Results PDF
             </button>
-            <button class="btn-action btn-info" onclick="downloadAllStudentsDataPDF()" title="Downloads every student's data (profile fields) as one PDF">
+            <button class="btn-action btn-info" onclick="downloadAllStudentsDataPDF()" title="Downloads every student's data (profile fields) as one PDF (A-Z)">
                 <i class="fas fa-file-download"></i> All Students Data PDF
             </button>
             <button class="btn-action btn-primary" onclick="openAddModal()">
@@ -1206,6 +1206,18 @@ function formatDOB(value) {
     return s;
 }
 
+// Returns a NEW array sorted A to Z by student name.
+// The original `students` array is untouched, so row index, edit and profile keep working.
+function getSortedStudents() {
+    return [...students].sort((a, b) => {
+        const nameA = (a.name || "").trim();
+        const nameB = (b.name || "").trim();
+        if (!nameA && nameB) return 1;   // blank names go last
+        if (nameA && !nameB) return -1;
+        return nameA.localeCompare(nameB, "en", { sensitivity: "base", numeric: true });
+    });
+}
+
 // Keeps the "Class" filter dropdown in sync with whatever classes are
 // actually present among the loaded students.
 function populateClassFilter() {
@@ -1297,7 +1309,7 @@ function exportCSV() {
     }
 
     const header = ["#", ...STUDENT_COLUMNS.map(col => col.label)];
-    const rows = students.map((student, index) => {
+    const rows = getSortedStudents().map((student, index) => {
         const row = STUDENT_COLUMNS.map(col => csvCell(col.key === "dob" ? formatDOB(student.dob) : student[col.key]));
         return [index + 1, ...row].join(",");
     });
@@ -2417,7 +2429,8 @@ async function downloadAllResultsPDF() {
     try {
         const images = await loadResultImages();
         const pdf = createResultPdf(images);
-        students.forEach((student, i) => {
+        // A-Z by student name (original `students` order is untouched)
+        getSortedStudents().forEach((student, i) => {
             if (i > 0) pdf.doc.addPage(); // every student on a fresh page
             pdf.renderStudent(student);
         });
@@ -2464,7 +2477,8 @@ function downloadAllStudentsDataPDF() {
     }
 
     const head = [["#", ...STUDENT_COLUMNS.map(col => col.label)]];
-    const body = students.map((student, i) => [
+    // A-Z by student name (original `students` order is untouched)
+    const body = getSortedStudents().map((student, i) => [
         i + 1,
         ...STUDENT_COLUMNS.map(col => col.key === "dob" ? formatDOB(student.dob) : (student[col.key] || "-"))
     ]);
