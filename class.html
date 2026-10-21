@@ -1657,7 +1657,6 @@ exportPdfBtn.addEventListener("click", function () {
     const doc = new jsPDF("landscape", "pt", "a4");
 
     // ===== Settings =====
-    const ROWS_PER_PAGE = 25;   // ek page pe 25 students
     const FONT_SIZE = 6;
     const CELL_PADDING = 2;
     const MARGIN_LEFT = 20;
@@ -1711,61 +1710,56 @@ exportPdfBtn.addEventListener("click", function () {
         14: { cellWidth: 147 }
     };
 
-    // Saari rows ek baar me banao, phir 25-25 ke chunks me baanto
+    // Saari rows ek hi table me do: autoTable khud page-break karega.
+    // Isse lambe address wali class (jaise 1B) me bhi page khali ya overflow nahi hoga.
     const allRows = data.map((student, index) => createStudentRow(student, index));
 
-    for (let start = 0; start < allRows.length; start += ROWS_PER_PAGE) {
+    doc.autoTable({
+        head: headers,
+        body: allRows,
+        theme: "grid",
+        startY: MARGIN_TOP,
+        margin: {
+            left: MARGIN_LEFT,
+            right: MARGIN_RIGHT,
+            top: MARGIN_TOP,
+            bottom: MARGIN_BOTTOM
+        },
+        tableWidth: 801,
 
-        if (start > 0) {
-            doc.addPage();
-        }
+        showHead: "everyPage",   // har page pe header repeat hoga
+        rowPageBreak: "avoid",   // koi student row beech se do page me nahi tutegi
 
-        const chunk = allRows.slice(start, start + ROWS_PER_PAGE);
+        styles: {
+            font: "helvetica",
+            fontSize: FONT_SIZE,
+            cellPadding: CELL_PADDING,
+            minCellHeight: 16,
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.4,
+            overflow: "linebreak",
+            valign: "middle",
+            halign: "left",
+            fontStyle: "normal"
+        },
 
-        doc.autoTable({
-            head: headers,
-            body: chunk,
-            theme: "grid",
-            startY: MARGIN_TOP,
-            margin: {
-                left: MARGIN_LEFT,
-                right: MARGIN_RIGHT,
-                top: MARGIN_TOP,
-                bottom: MARGIN_BOTTOM
-            },
-            tableWidth: 801,
+        headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            fontStyle: "bold",
+            fontSize: FONT_SIZE,
+            cellPadding: CELL_PADDING,
+            minCellHeight: 18,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.4,
+            halign: "left",
+            valign: "middle"
+        },
 
-            styles: {
-                font: "helvetica",
-                fontSize: FONT_SIZE,
-                cellPadding: CELL_PADDING,
-                minCellHeight: 16,
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.4,
-                overflow: "linebreak",
-                valign: "middle",
-                halign: "left",
-                fontStyle: "normal"
-            },
-
-            headStyles: {
-                fillColor: [255, 255, 255],
-                textColor: [0, 0, 0],
-                fontStyle: "bold",
-                fontSize: FONT_SIZE,
-                cellPadding: CELL_PADDING,
-                minCellHeight: 18,
-                lineColor: [0, 0, 0],
-                lineWidth: 0.4,
-                halign: "left",
-                valign: "middle"
-            },
-
-            alternateRowStyles: { fillColor: [255, 255, 255] },
-            columnStyles: columnStyles
-        });
-    }
+        alternateRowStyles: { fillColor: [255, 255, 255] },
+        columnStyles: columnStyles
+    });
 
     // Title, footer aur "Page X of Y" har page pe ek hi baar
     const totalPages = doc.internal.getNumberOfPages();
