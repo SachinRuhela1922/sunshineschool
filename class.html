@@ -1360,6 +1360,7 @@ function renderTable(students) {
 
 
       const category =
+        student.category ||
         student.rollnumber ||
         "-";
 
@@ -1655,9 +1656,14 @@ exportPdfBtn.addEventListener("click", function () {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF("landscape", "pt", "a4");
 
-    const FONT_SIZE = 7;
-    const CELL_PADDING = 2.5;
-    const MIN_CELL_HEIGHT = 18;
+    // ===== Settings =====
+    const ROWS_PER_PAGE = 25;   // ek page pe 25 students
+    const FONT_SIZE = 6;
+    const CELL_PADDING = 2;
+    const MARGIN_LEFT = 20;
+    const MARGIN_RIGHT = 20;
+    const MARGIN_TOP = 38;
+    const MARGIN_BOTTOM = 25;
 
     function createStudentRow(student, index) {
         return [
@@ -1672,104 +1678,124 @@ exportPdfBtn.addEventListener("click", function () {
             student.phone || student.father?.phone || student.contact?.phone || "-",
             student.fees?.transactionId || student.transactionId || "-",
             student.documents?.aadhaarNumber || student.aadhaarNumber || "-",
-            student.category || "-",
+            student.category || student.rollnumber || "-",
             student.father?.occupation || "-",
             student.admissionNumber || "-",
             student.contact?.address || student.address || "-"
         ];
     }
 
+    // Table ke saare 15 columns (Action ko chhodkar)
     const headers = [[
         "#", "Student", "Roll No", "Father", "Mother", "DOB", "Caste",
         "S.R Number", "Mobile", "PEN No", "Aadhaar",
         "Category", "Father Occ.", "Admission No", "Address"
     ]];
 
+    // Total width = 801pt = A4 landscape (841.89) - left/right margins (40)
     const columnStyles = {
-        0: { cellWidth: 18 }, 1: { cellWidth: 65 }, 2: { cellWidth: 35 },
-        3: { cellWidth: 65 }, 4: { cellWidth: 65 }, 5: { cellWidth: 45 },
-        6: { cellWidth: 52 }, 7: { cellWidth: 55 }, 8: { cellWidth: 52 },
-        9: { cellWidth: 45 }, 10: { cellWidth: 58 }, 11: { cellWidth: 48 },
-        12: { cellWidth: 55 }, 13: { cellWidth: 55 }, 14: { cellWidth: 88 }
+        0: { cellWidth: 16 },
+        1: { cellWidth: 62 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 62 },
+        4: { cellWidth: 62 },
+        5: { cellWidth: 42 },
+        6: { cellWidth: 42 },
+        7: { cellWidth: 48 },
+        8: { cellWidth: 50 },
+        9: { cellWidth: 46 },
+        10: { cellWidth: 56 },
+        11: { cellWidth: 42 },
+        12: { cellWidth: 50 },
+        13: { cellWidth: 46 },
+        14: { cellWidth: 147 }
     };
 
-    // Ab saare rows ek hi baar me — koi manual slicing nahi
-    const rows = data.map((student, index) => createStudentRow(student, index));
+    // Saari rows ek baar me banao, phir 25-25 ke chunks me baanto
+    const allRows = data.map((student, index) => createStudentRow(student, index));
 
-    doc.autoTable({
-        head: headers,
-        body: rows,
-        theme: "grid",
-        startY: 38,
-        margin: { left: 20, right: 20, top: 38, bottom: 25 },
-        tableWidth: "wrap",
+    for (let start = 0; start < allRows.length; start += ROWS_PER_PAGE) {
 
-        // Yehi key setting hai — page bharte hi khud naya page banayega
-        pageBreak: "auto",
-        rowPageBreak: "avoid",   // ek row beech me nahi kategi
-        showHead: "everyPage",   // har page pe header repeat hoga
-
-        styles: {
-            font: "helvetica",
-            fontSize: FONT_SIZE,
-            cellPadding: CELL_PADDING,
-            minCellHeight: MIN_CELL_HEIGHT,
-            textColor: [0, 0, 0],
-            lineColor: [0, 0, 0],
-            lineWidth: 0.5,
-            overflow: "linebreak",
-            valign: "middle",
-            halign: "left",
-            fontStyle: "normal"
-        },
-
-        headStyles: {
-            fillColor: [255, 255, 255],
-            textColor: [0, 0, 0],
-            fontStyle: "bold",
-            fontSize: FONT_SIZE,
-            cellPadding: CELL_PADDING,
-            minCellHeight: 20,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.5,
-            halign: "left",
-            valign: "middle"
-        },
-
-        alternateRowStyles: { fillColor: [255, 255, 255] },
-        columnStyles: columnStyles,
-
-        // Title aur footer har page pe autoTable khud draw karega jab bhi naya page bane
-        didDrawPage: function () {
-            doc.setTextColor(0, 0, 0);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(14);
-            doc.text(
-                `Class = ${displayName} [Students List - Sunshine School]`,
-                20, 28
-            );
-
-            const pageNumber = doc.internal.getNumberOfPages();
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(7);
-            doc.text(
-                `Sunshine School | Students List | Page ${pageNumber}`,
-                20,
-                doc.internal.pageSize.getHeight() - 10
-            );
+        if (start > 0) {
+            doc.addPage();
         }
-    });
 
-    // Total pages ab pata chalega tabhi jab poora table ban chuka ho
+        const chunk = allRows.slice(start, start + ROWS_PER_PAGE);
+
+        doc.autoTable({
+            head: headers,
+            body: chunk,
+            theme: "grid",
+            startY: MARGIN_TOP,
+            margin: {
+                left: MARGIN_LEFT,
+                right: MARGIN_RIGHT,
+                top: MARGIN_TOP,
+                bottom: MARGIN_BOTTOM
+            },
+            tableWidth: 801,
+
+            styles: {
+                font: "helvetica",
+                fontSize: FONT_SIZE,
+                cellPadding: CELL_PADDING,
+                minCellHeight: 16,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.4,
+                overflow: "linebreak",
+                valign: "middle",
+                halign: "left",
+                fontStyle: "normal"
+            },
+
+            headStyles: {
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+                fontStyle: "bold",
+                fontSize: FONT_SIZE,
+                cellPadding: CELL_PADDING,
+                minCellHeight: 18,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.4,
+                halign: "left",
+                valign: "middle"
+            },
+
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            columnStyles: columnStyles
+        });
+    }
+
+    // Title, footer aur "Page X of Y" har page pe ek hi baar
     const totalPages = doc.internal.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text(
+            `Class = ${displayName} [Students List - Sunshine School]`,
+            MARGIN_LEFT, 28
+        );
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.text(
             `Page ${i} of ${totalPages}`,
-            doc.internal.pageSize.getWidth() - 75,
+            pageWidth - 75,
             28
+        );
+
+        doc.setFontSize(7);
+        doc.text(
+            `Sunshine School | Students List | Page ${i}`,
+            MARGIN_LEFT,
+            pageHeight - 10
         );
     }
 
