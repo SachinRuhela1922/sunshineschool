@@ -1191,24 +1191,18 @@ searchInput.addEventListener(
 function formatDOB(dateValue) {
   if (!dateValue) return "-";
 
-  // Only the birth year is known (e.g. "2008") - show just the year.
-  if (/^\d{4}$/.test(String(dateValue).trim())) {
-    return String(dateValue).trim();
+  const text = String(dateValue).trim();
+
+  // Old records saved as MongoDB ISO date (2006-08-20T00:00:00.000Z) -> DD/MM/YYYY.
+  // Timezone conversion nahi karte, sirf date portion lete hain.
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+
+  if (iso) {
+    return `${iso[3]}/${iso[2]}/${iso[1]}`;
   }
 
-  // MongoDB ISO date: 2006-08-20T00:00:00.000Z
-  // Sirf date portion lenge, timezone conversion nahi karenge.
-  const dateString = String(dateValue).split("T")[0];
-
-  const parts = dateString.split("-");
-
-  if (parts.length === 3) {
-    const [year, month, day] = parts;
-
-    return `${day}/${month}/${year}`;
-  }
-
-  return "-";
+  // DOB typed by hand (e.g. "21/05/2008" or "2008") - show exactly as saved.
+  return text || "-";
 }
 
 /* ================= TABLE ================= */
@@ -1306,7 +1300,7 @@ function renderTable(students) {
   students.forEach(
     (student,index) => {
 
-      const dob = formatDOB(student.dob || student.dobYear);
+      const dob = formatDOB(student.dob);
 
       const bloodGroup =
         student.bloodGroup ||
@@ -1676,7 +1670,7 @@ exportPdfBtn.addEventListener("click", function () {
             student.rollNumber || student.rollNo || student.academic?.rollNumber || student.academic?.rollNo || "-",
             student.father?.name || student.fatherName || "-",
             student.mother?.name || student.motherName || "-",
-            formatDOB(student.dob || student.dobYear),
+            formatDOB(student.dob),
             student.bloodGroup || student.personal?.bloodGroup || student.medical?.bloodGroup || student.documents?.bloodGroup || "-",
             student.academic?.previousClass || student.previousClass || "-",
             student.phone || student.father?.phone || student.contact?.phone || "-",

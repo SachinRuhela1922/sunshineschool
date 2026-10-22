@@ -909,11 +909,7 @@
                     </div>
                     <div class="field">
                         <label><i class="fas fa-calendar"></i> Date of Birth</label>
-                        <input type="date" id="dob">
-                    </div>
-                    <div class="field">
-                        <label><i class="fas fa-calendar-check"></i> Birth Year (if full date unknown)</label>
-                        <input type="number" id="dobYear" placeholder="e.g. 2008" min="1900" max="2100" step="1">
+                        <input type="text" id="dob" placeholder="DD/MM/YYYY ya sirf saal (e.g. 2008)" maxlength="40" autocomplete="off">
                     </div>
                     <div class="field">
                         <label><i class="fas fa-layer-group"></i> Caste</label>
@@ -1195,21 +1191,12 @@ async function loadClass() {
 function formatDOB(value) {
     if (!value) return "-";
     const s = String(value).trim();
-    const pad = n => String(n).padStart(2, "0");
 
-    // Only the birth year is known (e.g. "2008") - show just the year.
-    if (/^\d{4}$/.test(s)) return s;
+    // Old records saved as a machine date (2005-09-10 or 2005-09-10T00:00:00.000Z)
+    // are shown as DD/MM/YYYY. Anything the user typed by hand is shown exactly as typed.
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
 
-    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) return `${pad(m[3])}/${pad(m[2])}/${m[1]}`;
-
-    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
-    if (m) return `${pad(m[1])}/${pad(m[2])}/${m[3]}`;
-
-    const parsed = new Date(s);
-    if (!isNaN(parsed.getTime())) {
-        return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()}`;
-    }
     return s;
 }
 
@@ -1491,15 +1478,8 @@ function editStudent(index) {
     setValue("penNumber", student.penNumber);
     setValue("aadharNumber", student.aadharNumber);
     setValue("email", student.email);
-    // Year-only DOB (e.g. "2008") goes in the Birth Year box, full date in the date box.
-    const savedDob = String(student.dob || "").trim();
-    if (/^\d{4}$/.test(savedDob)) {
-        setValue("dob", "");
-        setValue("dobYear", savedDob);
-    } else {
-        setValue("dob", savedDob.substring(0, 10));
-        setValue("dobYear", savedDob ? savedDob.substring(0, 4) : "");
-    }
+    // Show DOB exactly as saved (old machine dates are shown as DD/MM/YYYY)
+    setValue("dob", student.dob ? formatDOB(student.dob) : "");
     setValue("caste", student.caste);
     setValue("category", student.category);
     setValue("studentClass", student.studentClass);
@@ -1544,7 +1524,6 @@ document.getElementById("studentForm").addEventListener("submit", async function
         aadharNumber: getValue("aadharNumber"),
         email: getValue("email"),
         dob: getValue("dob"),
-        dobYear: getValue("dobYear"),
         caste: getValue("caste"),
         category: getValue("category"),
         studentClass: getValue("studentClass"),
@@ -1657,21 +1636,6 @@ function viewStudent(index) {
     window.location.href = url;
 }
 
-
-// DOB: picking a full date fills the year; typing a different year clears the date.
-(function setupDobSync() {
-    const dobEl = document.getElementById("dob");
-    const yearEl = document.getElementById("dobYear");
-    if (!dobEl || !yearEl) return;
-    dobEl.addEventListener("change", function () {
-        yearEl.value = dobEl.value ? dobEl.value.substring(0, 4) : "";
-    });
-    yearEl.addEventListener("input", function () {
-        if (dobEl.value && dobEl.value.substring(0, 4) !== yearEl.value.trim()) {
-            dobEl.value = "";
-        }
-    });
-})();
 
 function goBack() {
     window.location.href = "extra-class.html";

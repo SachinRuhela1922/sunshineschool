@@ -545,11 +545,7 @@
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-calendar-day"></i> Date of Birth</label>
-                            <input type="date" id="dob">
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar-check"></i> Birth Year (if full date unknown)</label>
-                            <input type="number" id="dobYear" placeholder="e.g. 2008" min="1900" max="2100" step="1">
+                            <input type="text" id="dob" placeholder="DD/MM/YYYY ya sirf saal (e.g. 2008)" maxlength="40" autocomplete="off">
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-venus-mars"></i> Gender</label>
@@ -823,11 +819,12 @@
             document.getElementById("studentName").value = student.studentName || "";
             document.getElementById("admissionNumber").value = student.admissionNumber || "";
             document.getElementById("rollNumber").value = student.rollNumber || "";
-            document.getElementById("dob").value = student.dob ? student.dob.substring(0, 10) : "";
-            // Full date known -> year is its year; otherwise use the saved year-only value
-            document.getElementById("dobYear").value = student.dob
-                ? student.dob.substring(0, 4)
-                : (student.dobYear || "");
+            // DOB is free text. Old records saved as a machine date (2005-09-10...) are shown as DD/MM/YYYY.
+            (function () {
+                const raw = String(student.dob || "").trim();
+                const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+                document.getElementById("dob").value = iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : raw;
+            })();
             document.getElementById("gender").value = student.gender || "";
             document.getElementById("bloodGroup").value = student.bloodGroup || "";
             document.getElementById("nationality").value = student.nationality || "";
@@ -907,20 +904,6 @@
     // SAVE CHANGES
     // ==========================================
 
-    // DOB: picking a full date fills the year; typing a different year clears the date.
-    (function setupDobSync() {
-        const dobEl = document.getElementById("dob");
-        const yearEl = document.getElementById("dobYear");
-        dobEl.addEventListener("change", function () {
-            yearEl.value = dobEl.value ? dobEl.value.substring(0, 4) : "";
-        });
-        yearEl.addEventListener("input", function () {
-            if (dobEl.value && dobEl.value.substring(0, 4) !== yearEl.value.trim()) {
-                dobEl.value = "";
-            }
-        });
-    })();
-
     form.addEventListener("submit", async function(e) {
         e.preventDefault();
 
@@ -928,8 +911,7 @@
             studentName: document.getElementById("studentName").value,
             admissionNumber: document.getElementById("admissionNumber").value,
             rollNumber: document.getElementById("rollNumber").value,
-            dob: document.getElementById("dob").value,
-            dobYear: document.getElementById("dobYear").value.trim(),
+            dob: document.getElementById("dob").value.trim(),
             gender: document.getElementById("gender").value,
             bloodGroup: document.getElementById("bloodGroup").value,
             nationality: document.getElementById("nationality").value,
