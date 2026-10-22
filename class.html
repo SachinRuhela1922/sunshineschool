@@ -1191,6 +1191,11 @@ searchInput.addEventListener(
 function formatDOB(dateValue) {
   if (!dateValue) return "-";
 
+  // Only the birth year is known (e.g. "2008") - show just the year.
+  if (/^\d{4}$/.test(String(dateValue).trim())) {
+    return String(dateValue).trim();
+  }
+
   // MongoDB ISO date: 2006-08-20T00:00:00.000Z
   // Sirf date portion lenge, timezone conversion nahi karenge.
   const dateString = String(dateValue).split("T")[0];
@@ -1301,7 +1306,7 @@ function renderTable(students) {
   students.forEach(
     (student,index) => {
 
-      const dob = formatDOB(student.dob);
+      const dob = formatDOB(student.dob || student.dobYear);
 
       const bloodGroup =
         student.bloodGroup ||
@@ -1671,7 +1676,7 @@ exportPdfBtn.addEventListener("click", function () {
             student.rollNumber || student.rollNo || student.academic?.rollNumber || student.academic?.rollNo || "-",
             student.father?.name || student.fatherName || "-",
             student.mother?.name || student.motherName || "-",
-            formatDOB(student.dob),
+            formatDOB(student.dob || student.dobYear),
             student.bloodGroup || student.personal?.bloodGroup || student.medical?.bloodGroup || student.documents?.bloodGroup || "-",
             student.academic?.previousClass || student.previousClass || "-",
             student.phone || student.father?.phone || student.contact?.phone || "-",
