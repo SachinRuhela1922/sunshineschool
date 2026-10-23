@@ -999,6 +999,103 @@ td input[readonly] {
     margin: 1.2rem 0;
 }
 
+/* ===== ADMIT SEARCH BAR ===== */
+.admit-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+}
+.admit-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+}
+.admit-search-box i.search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #f58a2e;
+    font-size: 0.9rem;
+}
+.admit-search-box input {
+    width: 100%;
+    padding: 0.7rem 2.4rem 0.7rem 2.4rem;
+    border: 2px solid #f0e2d2;
+    border-radius: 60px;
+    font-size: 0.92rem;
+    background: #fcfaf7;
+    outline: none;
+    font-weight: 500;
+    color: #1f160c;
+}
+.admit-search-box input:focus {
+    border-color: #f58a2e;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(245, 138, 46, 0.12);
+}
+.admit-search-box .clear-search {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #fce4e0;
+    color: #b53b2e;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+}
+.admit-search-box .clear-search.show { display: block; }
+.admit-search-count {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #7f6a4b;
+    background: #fcf3e8;
+    padding: 0.4rem 1rem;
+    border-radius: 30px;
+    border: 1px solid #f0e2d2;
+}
+.admit-no-result {
+    display: none;
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: #b09a7e;
+    font-weight: 600;
+}
+.admit-no-result i {
+    font-size: 2rem;
+    color: #f0e2d2;
+    display: block;
+    margin-bottom: 0.6rem;
+}
+.admit-card-preview { margin-bottom: 0.4rem; }
+.admit-card-wrap { margin-bottom: 1.4rem; }
+.single-download-btn {
+    background: linear-gradient(135deg, #2b7a3a, #3a9e4a);
+    color: #fff;
+    border: none;
+    padding: 0.45rem 1.1rem;
+    border-radius: 40px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.single-download-btn:hover { box-shadow: 0 4px 14px rgba(43, 122, 58, 0.3); }
+.download-pdf-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.admit-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.6rem;
+}
+
 /* ===== FOOTER ===== */
 .footer-note {
     margin-top: 2.5rem;
@@ -1560,18 +1657,37 @@ td .absent-btn {
                 <i class="fas fa-times"></i> Close
             </button>
         </div>
+
+        <!-- SEARCH -->
+        <div class="admit-search-bar">
+            <div class="admit-search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="admitSearchInput"
+                       placeholder="Search student: name, ID, roll no, admission no, father, phone..."
+                       oninput="filterAdmitCards()" autocomplete="off">
+                <button type="button" class="clear-search" id="clearSearchBtn" onclick="clearAdmitSearch()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <span class="admit-search-count" id="admitSearchCount">0 students</span>
+        </div>
+
         <div id="overlayBody">
             <div class="loading">
                 <i class="fas fa-circle-notch"></i>
                 <p>Loading preview...</p>
             </div>
         </div>
+        <div class="admit-no-result" id="admitNoResult">
+            <i class="fas fa-user-slash"></i> No student found for this search.
+        </div>
+
         <div class="overlay-actions">
             <button class="edit-admit-btn" onclick="openAdmitEdit()">
                 <i class="fas fa-pen"></i> Edit Admit Card
             </button>
-            <button class="download-pdf-btn" onclick="downloadFromOverlay()">
-                <i class="fas fa-file-pdf"></i> Download All as PDF
+            <button class="download-pdf-btn" id="downloadOverlayBtn" onclick="downloadFromOverlay()">
+                <i class="fas fa-file-pdf"></i> <span id="downloadOverlayLabel">Download All as PDF</span>
             </button>
         </div>
     </div>
@@ -1617,6 +1733,37 @@ let students = [];
 let existingMarks = [];
 let studentSubjects = {}; // Will store subject list for each student
 let currentAdmitCardData = [];
+let currentStudentGroups = [];
+
+function getAdmitStudentKey(row) {
+    const keys = Object.keys(row);
+    const find = (name) =>
+        keys.find(k => k.toLowerCase().replace(/\s+/g, "") === name.toLowerCase());
+
+    const idKey = find("studentId") || find("rollNumber") || find("admissionNumber");
+    if (idKey && row[idKey]) return row[idKey];
+
+    const nameKey = find("studentName");
+    return nameKey ? row[nameKey] : JSON.stringify(row);
+}
+
+function groupAdmitRows(rows) {
+    const groups = new Map();
+    rows.forEach(row => {
+        const key = getAdmitStudentKey(row);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    });
+    return Array.from(groups.values());
+}
+
+function getAdmitStudentName(studentRows) {
+    const first = studentRows[0] || {};
+    const k = Object.keys(first).find(
+        x => x.toLowerCase().replace(/\s+/g, "") === "studentname"
+    );
+    return k ? String(first[k] || "").trim() : "";
+}
 
 // ==========================================
 // PHONE + ADDRESS HELPERS
@@ -2372,6 +2519,11 @@ function openOverlay(rows) {
     const body = document.getElementById('overlayBody');
     currentAdmitCardData = rows;
     body.innerHTML = generateAdmitCardPreviewHTML(rows);
+
+    const input = document.getElementById('admitSearchInput');
+    if (input) input.value = '';
+    filterAdmitCards();
+
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
@@ -2423,19 +2575,8 @@ function holidayText(h) {
 
 function generateAdmitCardPreviewHTML(rows) {
     if (!rows || !rows.length) {
+        currentStudentGroups = [];
         return '<div class="error"><i class="fas fa-file"></i> No admit card data available.</div>';
-    }
-
-    function getStudentKey(row) {
-        const keys = Object.keys(row);
-        const find = (name) =>
-            keys.find(k => k.toLowerCase().replace(/\s+/g, "") === name.toLowerCase());
-
-        const idKey = find("studentId") || find("rollNumber") || find("admissionNumber");
-        if (idKey && row[idKey]) return row[idKey];
-
-        const nameKey = find("studentName");
-        return nameKey ? row[nameKey] : JSON.stringify(row);
     }
 
     const infoFieldMap = [
@@ -2452,46 +2593,41 @@ function generateAdmitCardPreviewHTML(rows) {
         ["dob", "Date of Birth"]
     ];
 
-    const infoKeysLower = infoFieldMap.map(([k]) => k.toLowerCase());
-    const groups = new Map();
+    const studentGroups = groupAdmitRows(rows);
+    currentStudentGroups = studentGroups;
 
-    rows.forEach(row => {
-        const key = getStudentKey(row);
-        if (!groups.has(key)) {
-            groups.set(key, []);
-        }
-        groups.get(key).push(row);
-    });
-
-    const studentGroups = Array.from(groups.values());
-    
     let html = '';
-    
+
     studentGroups.forEach((studentRows, index) => {
-        if (index > 0) {
-            html += '<div class="page-break"></div>';
-        }
-        
         const firstRow = studentRows[0];
-        const usedKeysLower = new Set();
-        
+
+        // search text (name, id, roll, admission, father, mother, phone)
+        const searchable = [];
+        ["studentName", "studentId", "rollNumber", "admissionNumber", "fatherName", "motherName", "phone"].forEach(name => {
+            const mk = Object.keys(firstRow).find(
+                k => k.toLowerCase().replace(/\s+/g, "") === name.toLowerCase()
+            );
+            if (mk && firstRow[mk]) searchable.push(String(firstRow[mk]));
+        });
+        const searchText = searchable.join(" ").toLowerCase();
+
+        html += `<div class="admit-card-wrap" data-idx="${index}" data-search="${escapeHtml(searchText)}">`;
         html += `<div class="admit-card-preview" onclick="openAdmitEdit()" title="Click to edit">`;
         html += `<span class="edit-hint"><i class="fas fa-pen"></i> Click to edit</span>`;
-        
+
         html += `
             <div class="header-band">
                 <h3>ADMIT CARD</h3>
-                <p>${exam} | Class: ${className}</p>
+                <p>${escapeHtml(exam)} | Class: ${escapeHtml(className)}</p>
             </div>
         `;
-        
+
         html += `<div class="info-grid">`;
         infoFieldMap.forEach(([key, label]) => {
             const matchedKey = Object.keys(firstRow).find(
                 k => k.toLowerCase().replace(/\s+/g, "") === key.toLowerCase()
             );
             if (matchedKey && firstRow[matchedKey]) {
-                usedKeysLower.add(matchedKey.toLowerCase());
                 html += `
                     <div class="info-item">
                         <strong>${label}:</strong> ${escapeHtml(String(firstRow[matchedKey]))}
@@ -2500,14 +2636,14 @@ function generateAdmitCardPreviewHTML(rows) {
             }
         });
         html += `</div>`;
-        
-        const subjectKeys = Object.keys(firstRow).filter(k => 
-            k.toLowerCase().includes('subject') || 
-            k.toLowerCase().includes('date') || 
+
+        const subjectKeys = Object.keys(firstRow).filter(k =>
+            k.toLowerCase().includes('subject') ||
+            k.toLowerCase().includes('date') ||
             k.toLowerCase().includes('day') ||
             k.toLowerCase().includes('time')
         );
-        
+
         if (subjectKeys.length) {
             html += `<div style="overflow-x:auto;">`;
             html += `<table>
@@ -2545,16 +2681,26 @@ function generateAdmitCardPreviewHTML(rows) {
             </table>`;
             html += `</div>`;
         }
-        
+
         html += `
             <div class="footer-text">
                 This is a system generated admit card.
             </div>
         `;
-        
-        html += `</div>`;
+
+        html += `</div>`; // end admit-card-preview
+
+        html += `
+            <div class="admit-card-actions">
+                <button type="button" class="single-download-btn" onclick="downloadSingleStudent(${index}, event)">
+                    <i class="fas fa-file-pdf"></i> Download this student
+                </button>
+            </div>
+        `;
+
+        html += `</div>`; // end admit-card-wrap
     });
-    
+
     return html;
 }
 
@@ -2729,12 +2875,94 @@ async function saveAdmitEdit() {
     }
 }
 
+// ===== SEARCH / FILTER =====
+function getVisibleAdmitIdxs() {
+    return Array.from(document.querySelectorAll('#overlayBody .admit-card-wrap'))
+        .filter(el => el.style.display !== 'none')
+        .map(el => Number(el.dataset.idx));
+}
+
+function filterAdmitCards() {
+    const input = document.getElementById('admitSearchInput');
+    const q = (input ? input.value : '').trim().toLowerCase();
+    const terms = q.split(/\s+/).filter(Boolean);
+    const wraps = document.querySelectorAll('#overlayBody .admit-card-wrap');
+
+    let visible = 0;
+    wraps.forEach(el => {
+        const text = el.dataset.search || '';
+        const match = terms.every(t => text.includes(t));
+        el.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+
+    const total = wraps.length;
+    document.getElementById('admitSearchCount').textContent =
+        q ? `${visible} of ${total} students` : `${total} student${total !== 1 ? 's' : ''}`;
+
+    document.getElementById('clearSearchBtn').classList.toggle('show', !!q);
+    document.getElementById('admitNoResult').style.display =
+        (q && visible === 0 && total > 0) ? 'block' : 'none';
+
+    const label = document.getElementById('downloadOverlayLabel');
+    const btn = document.getElementById('downloadOverlayBtn');
+    if (q) {
+        label.textContent = visible === 1
+            ? 'Download This Student as PDF'
+            : `Download Filtered (${visible}) as PDF`;
+        btn.disabled = visible === 0;
+    } else {
+        label.textContent = 'Download All as PDF';
+        btn.disabled = false;
+    }
+}
+
+function clearAdmitSearch() {
+    const input = document.getElementById('admitSearchInput');
+    input.value = '';
+    filterAdmitCards();
+    input.focus();
+}
+
+// ===== DOWNLOADS =====
 function downloadFromOverlay() {
     if (!currentAdmitCardData || !currentAdmitCardData.length) {
         alert('No data to download.');
         return;
     }
-    generateAdmitCardsPDF(currentAdmitCardData);
+
+    const input = document.getElementById('admitSearchInput');
+    const q = (input ? input.value : '').trim();
+
+    // Search nahi kiya -> sabka PDF
+    if (!q) {
+        generateAdmitCardsPDF(currentAdmitCardData);
+        return;
+    }
+
+    // Search kiya -> sirf filtered students
+    const idxs = getVisibleAdmitIdxs();
+    if (!idxs.length) {
+        alert('No student found to download.');
+        return;
+    }
+
+    const filteredRows = idxs.flatMap(i => currentStudentGroups[i] || []);
+    const suffix = idxs.length === 1
+        ? (getAdmitStudentName(currentStudentGroups[idxs[0]]) || 'Student')
+        : 'Filtered';
+    generateAdmitCardsPDF(filteredRows, suffix);
+}
+
+function downloadSingleStudent(idx, event) {
+    if (event) event.stopPropagation();
+    const studentRows = currentStudentGroups[idx];
+    if (!studentRows || !studentRows.length) {
+        alert('Student data not found.');
+        return;
+    }
+    const name = getAdmitStudentName(studentRows) || `Student_${idx + 1}`;
+    generateAdmitCardsPDF(studentRows, name);
 }
 
 async function downloadAdmitCards() {
@@ -2799,7 +3027,7 @@ function loadImageSafe(img) {
     });
 }
 
-async function generateAdmitCardsPDF(rows) {
+async function generateAdmitCardsPDF(rows, fileSuffix) {
     const { jsPDF } = window.jspdf;
 
     const logo = new Image();
@@ -3355,8 +3583,12 @@ async function generateAdmitCardsPDF(rows) {
         doc.text("Examination In-charge Signature", rightBoxX + sigBoxWidth / 2, sigTextY, { align: "center" });
     });
 
+    const safeSuffix = fileSuffix
+        ? "_" + String(fileSuffix).trim().replace(/[^\w\-]+/g, "_")
+        : "";
+
     doc.save(
-        `Admit_Cards_${exam}_${className}.pdf`
+        `Admit_Cards_${exam}_${className}${safeSuffix}.pdf`
             .replace(/\s+/g, "_")
     );
 }
