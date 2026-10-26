@@ -2478,14 +2478,28 @@ function downloadAllStudentsDataPDF() {
         ...STUDENT_COLUMNS.map(col => col.key === "dob" ? formatDOB(student.dob) : (student[col.key] || "-"))
     ]);
 
-    doc.autoTable({
+        doc.autoTable({
         startY: 26,
         margin: { top: 26, left: 8, right: 8 },
         theme: "grid",
         head,
         body,
-        styles: { font: "helvetica", fontSize: 6.5, cellPadding: 1.3, textColor: [40, 40, 40], overflow: "linebreak" },
-        headStyles: { fillColor: [245, 138, 46], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: {
+            font: "helvetica",
+            fontSize: 6.5,
+            cellPadding: 1.3,
+            textColor: [0, 0, 0],        // text bhi dark black
+            overflow: "linebreak",
+            lineColor: [0, 0, 0],        // table ki lines dark black
+            lineWidth: 0.35              // lines thodi mota (print mein clear)
+        },
+        headStyles: {
+            fillColor: [245, 138, 46],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            lineColor: [0, 0, 0],        // header ki border bhi black
+            lineWidth: 0.35
+        },
         columnStyles: { 0: { cellWidth: 7 } },
         didDrawPage: function () {
             drawDataHeader();
