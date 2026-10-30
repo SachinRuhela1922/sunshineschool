@@ -648,6 +648,69 @@
         grid-template-columns: repeat(2, 1fr);
       }
     }
+
+    /* ================= DOWNLOAD DROPDOWN ================= */
+
+    .download-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .download-dropdown .logout-btn {
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .download-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 270px;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, .25);
+      padding: .4rem;
+      z-index: 9999;
+    }
+
+    .download-menu.show {
+      display: block;
+    }
+
+    .download-menu button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      background: transparent;
+      border: none;
+      color: #1f2937;
+      font-size: .92rem;
+      font-weight: 600;
+      font-family: inherit;
+      text-align: left;
+      padding: .7rem .9rem;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .download-menu button:hover {
+      background: #fff3d6;
+    }
+
+    .download-menu button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 600px) {
+      .download-menu {
+        right: auto;
+        left: 0;
+        min-width: 240px;
+      }
+    }
   </style>
 </head>
 
@@ -667,9 +730,24 @@
         <i class="fas fa-crown"></i>
         Admin · root
       </div>
-     <button class="logout-btn" id="downloadBtn">
-            Download PDF
+      <div class="download-dropdown">
+        <button type="button" class="logout-btn" id="downloadBtn">
+          <i class="fas fa-file-pdf"></i>
+          Download PDF
+          <i class="fas fa-chevron-down" style="font-size:.7rem;"></i>
         </button>
+
+        <div class="download-menu" id="downloadMenu">
+          <button type="button" data-school="junior">
+            <i class="fas fa-download"></i>
+            Sunshine Junior High School Download
+          </button>
+          <button type="button" data-school="public">
+            <i class="fas fa-download"></i>
+            Sunshine Public School Download
+          </button>
+        </div>
+      </div>
 
       <a href="index.html" class="logout-btn" onclick="sessionStorage.removeItem('isAdminLoggedIn');">
         <i class="fas fa-arrow-right-from-bracket"></i>
@@ -1926,19 +2004,76 @@ document
 
   <script>
     const downloadBtn = document.getElementById("downloadBtn");
+    const downloadMenu = document.getElementById("downloadMenu");
+    const menuButtons = downloadMenu.querySelectorAll("button[data-school]");
 
     // ============================================================
-    // LETTERHEAD IMAGE PATH
+    // LETTERHEAD CONFIG
+    // Junior High School  -> Letter Head 1
+    // Public School       -> Letter Head 2
+    // (images/ folder me ye dono files rakho)
     // ============================================================
 
-    const LETTERHEAD_IMAGE = "./images/letterhead.jpeg";
+    const LETTERHEADS = {
+      junior: {
+        image: "./images/letter-head2.jpg",
+        fileName: "Sunshine_Junior_High_School_Letter_Head.pdf"
+      },
+      public: {
+        image: "./images/letterhead.jpeg",
+        fileName: "Sunshine_Public_School_Letter_Head.pdf"
+      }
+    };
+
+    const BTN_HTML = downloadBtn.innerHTML;
+
+
+    // ============================================================
+    // DROPDOWN OPEN / CLOSE
+    // ============================================================
+
+    downloadBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      downloadMenu.classList.toggle("show");
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!downloadMenu.contains(e.target)) {
+        downloadMenu.classList.remove("show");
+      }
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        downloadMenu.classList.remove("show");
+      }
+    });
+
+
+    // ============================================================
+    // MENU ITEM CLICK
+    // ============================================================
+
+    menuButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const config = LETTERHEADS[btn.dataset.school];
+        downloadMenu.classList.remove("show");
+        downloadLetterheadPdf(config);
+      });
+    });
 
 
     // ============================================================
     // DOWNLOAD PDF
     // ============================================================
 
-    downloadBtn.addEventListener("click", function () {
+    function resetButton() {
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = BTN_HTML;
+      menuButtons.forEach(function (b) { b.disabled = false; });
+    }
+
+    function downloadLetterheadPdf(config) {
 
       if (!window.jspdf || !window.jspdf.jsPDF) {
         alert("jsPDF is not loaded.");
@@ -1947,6 +2082,7 @@ document
 
       downloadBtn.disabled = true;
       downloadBtn.textContent = "Generating PDF...";
+      menuButtons.forEach(function (b) { b.disabled = true; });
 
       const img = new Image();
 
@@ -1970,8 +2106,7 @@ document
           const pageWidth = doc.internal.pageSize.getWidth();
           const pageHeight = doc.internal.pageSize.getHeight();
 
-          // Keep image exactly in the same orientation.
-          // Scale it DOWN just enough so the complete image fits.
+          // Image ko page me poora fit karo (ratio same rahega)
           const imageRatio = img.width / img.height;
           const pageRatio = pageWidth / pageHeight;
 
@@ -1986,7 +2121,7 @@ document
             imageWidth = imageHeight * imageRatio;
           }
 
-          // Small safety reduction to prevent bottom-edge clipping
+          // Bottom-edge clipping se bachne ke liye chhota safety margin
           const safety = 0.98;
 
           imageWidth *= safety;
@@ -1997,7 +2132,7 @@ document
 
           doc.addImage(
             img,
-            "JPEG",
+            fileTypeFromImage(img),
             imageX,
             imageY,
             imageWidth,
@@ -2006,22 +2141,15 @@ document
             "FAST"
           );
 
-
           // =================================================
           // SAVE
           // =================================================
 
-          doc.save(
-            "Sun_Shine_Letter_Head.pdf"
-          );
-
+          doc.save(config.fileName);
 
         } catch (error) {
 
-          console.error(
-            "PDF generation error:",
-            error
-          );
+          console.error("PDF generation error:", error);
 
           alert(
             "PDF generate nahi ho payi.\n\n" +
@@ -2029,35 +2157,26 @@ document
           );
         }
 
-
-        downloadBtn.disabled = false;
-
-        downloadBtn.textContent =
-          "Download PDF";
+        resetButton();
       };
-
 
       img.onerror = function () {
 
         alert(
           "Letter head image load nahi ho payi.\n\n" +
           "Check image path:\n" +
-          LETTERHEAD_IMAGE
+          config.image
         );
 
-        downloadBtn.disabled = false;
-
-        downloadBtn.textContent =
-          "Download PDF";
+        resetButton();
       };
 
-
       // =================================================
-      // LOAD ORIGINAL IMAGE
+      // LOAD IMAGE
       // =================================================
 
-      img.src = LETTERHEAD_IMAGE;
-    });
+      img.src = config.image;
+    }
 
 
     // ============================================================
@@ -2066,8 +2185,7 @@ document
 
     function fileTypeFromImage(img) {
 
-      const src =
-        img.src.toLowerCase();
+      const src = img.src.toLowerCase();
 
       if (src.includes(".png")) {
         return "PNG";
