@@ -1856,18 +1856,18 @@ async function loadData(silent) {
         }
 
         function pdfFormatDate(value) {
-            if (!value) return "N/A";
-            const d = new Date(value);
-            if (isNaN(d.getTime())) {
-                return String(value);
-            }
-            const day = String(d.getDate()).padStart(2, "0");
-            const months = [
-                "Jan", "Feb", "Mar", "Apr",
-                "May", "Jun", "Jul", "Aug",
-                "Sep", "Oct", "Nov", "Dec"
-            ];
-            return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+          if (value === null || value === undefined) return "N/A";
+          const pad = n => String(n).padStart(2, "0");
+          const text = String(value).trim();
+          if (!text) return "N/A";
+          // 2006-08-20 / 2006-08-20T00:00:00.000Z -> 20/08/2006 (timezone convert nahi karte)
+          const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+          if (iso) return `${pad(iso[3])}/${pad(iso[2])}/${iso[1]}`;
+          // 21-05-2008, 21.5.2008, 21/05/2008 -> 21/05/2008
+          const dmy = text.match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})$/);
+          if (dmy) return `${pad(dmy[1])}/${pad(dmy[2])}/${dmy[3]}`;
+          // Sirf saal ("2008") ya koi aur text - jaisa saved hai waisa
+          return text;
         }
 
         function loadImageSafe(src) {
@@ -2792,12 +2792,18 @@ async function loadData(silent) {
                     return String(value || "").replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_").trim();
                 }
                 function pdfFormatDate(value) {
-                    if (!value) return "N/A";
-                    const d = new Date(value);
-                    if (isNaN(d.getTime())) return String(value);
-                    const day = String(d.getDate()).padStart(2, "0");
-                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+                  if (value === null || value === undefined) return "N/A";
+                  const pad = n => String(n).padStart(2, "0");
+                  const text = String(value).trim();
+                  if (!text) return "N/A";
+                  // 2006-08-20 / 2006-08-20T00:00:00.000Z -> 20/08/2006 (timezone convert nahi karte)
+                  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+                  if (iso) return `${pad(iso[3])}/${pad(iso[2])}/${iso[1]}`;
+                  // 21-05-2008, 21.5.2008, 21/05/2008 -> 21/05/2008
+                  const dmy = text.match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})$/);
+                  if (dmy) return `${pad(dmy[1])}/${pad(dmy[2])}/${dmy[3]}`;
+                  // Sirf saal ("2008") ya koi aur text - jaisa saved hai waisa
+                  return text;
                 }
                 function loadImageSafe(src) {
                     return new Promise(resolve => {

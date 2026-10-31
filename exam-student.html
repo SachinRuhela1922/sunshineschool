@@ -1851,8 +1851,11 @@ async function enrichRowsWithPhone(rows) {
         const hasPhone = phoneKey && String(row[phoneKey] || "").trim();
         const hasAddr = addrKey && String(row[addrKey] || "").trim();
 
-        // Dono pehle se hain to kuch mat karo
-        if (hasPhone && hasAddr) return row;
+        const dobKey = find("dob");
+        const csvDob = dobKey ? formatAdmitDOB(row[dobKey]) : "";
+
+        // Phone, address aur sahi DOB teeno pehle se hain to kuch mat karo
+        if (hasPhone && hasAddr && csvDob) return row;
 
         const idKey = find("studentId");
         const admKey = find("admissionNumber");
@@ -1866,6 +1869,14 @@ async function enrichRowsWithPhone(rows) {
         if (!student && nameKey && row[nameKey]) student = byName.get(norm(row[nameKey]));
 
         const updated = { ...row };
+
+        // DOB: CSV me "Invalid Date"/khali ho to student record se lo,
+        // aur hamesha DD/MM/YYYY (ya sirf saal) me rakho.
+        {
+            const studentDob = student ? formatAdmitDOB(student.dob) : "";
+            const finalDob = csvDob || studentDob;
+            updated[dobKey || "DOB"] = finalDob;
+        }
 
         if (!hasPhone) {
             const phone = getStudentPhone(student);
@@ -2476,6 +2487,26 @@ async function saveMarks(index) {
 // OTHER FUNCTIONS (UNCHANGED)
 // ==========================================
 
+// DOB hamesha DD/MM/YYYY me. Sirf saal ("2008") ho to wahi dikhega.
+// "Invalid Date" / khali value ko khali maana jata hai.
+function formatAdmitDOB(value) {
+    if (value === null || value === undefined) return "";
+    const pad = n => String(n).padStart(2, "0");
+    const text = String(value).trim();
+    if (!text || /^invalid date$/i.test(text)) return "";
+
+    // 2006-08-20 / 2006-08-20T00:00:00.000Z -> 20/08/2006
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+    if (iso) return `${pad(iso[3])}/${pad(iso[2])}/${iso[1]}`;
+
+    // 21-05-2008, 21.5.2008, 21/05/2008 -> 21/05/2008
+    const dmy = text.match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})$/);
+    if (dmy) return `${pad(dmy[1])}/${pad(dmy[2])}/${dmy[3]}`;
+
+    // Sirf saal ya koi aur text - jaisa saved hai waisa
+    return text;
+}
+
 function formatDateValue(value) {
     if (!value) return "";
 
@@ -2627,10 +2658,13 @@ function generateAdmitCardPreviewHTML(rows) {
             const matchedKey = Object.keys(firstRow).find(
                 k => k.toLowerCase().replace(/\s+/g, "") === key.toLowerCase()
             );
-            if (matchedKey && firstRow[matchedKey]) {
+            const previewValue = key === "dob"
+                ? formatAdmitDOB(matchedKey ? firstRow[matchedKey] : "")
+                : (matchedKey ? String(firstRow[matchedKey] || "") : "");
+            if (matchedKey && previewValue) {
                 html += `
                     <div class="info-item">
-                        <strong>${label}:</strong> ${escapeHtml(String(firstRow[matchedKey]))}
+                        <strong>${label}:</strong> ${escapeHtml(previewValue)}
                     </div>
                 `;
             }
@@ -3263,9 +3297,12 @@ async function generateAdmitCardsPDF(rows, fileSuffix) {
                     key.toLowerCase()
             );
 
-            if (matchedKey && firstRow[matchedKey]) {
+            const pdfValue = key === "dob"
+                ? formatAdmitDOB(matchedKey ? firstRow[matchedKey] : "")
+                : (matchedKey ? String(firstRow[matchedKey] || "") : "");
+            if (matchedKey && pdfValue) {
                 usedKeysLower.add(matchedKey.toLowerCase());
-                const value = String(firstRow[matchedKey]);
+                const value = pdfValue;
 
                 if (col % 2 === 0) {
                     doc.setFont("helvetica", "bold");

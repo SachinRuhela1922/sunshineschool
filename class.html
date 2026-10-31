@@ -1188,21 +1188,19 @@ searchInput.addEventListener(
 
   }
 );
-function formatDOB(dateValue) {
-  if (!dateValue) return "-";
-
-  const text = String(dateValue).trim();
-
-  // Old records saved as MongoDB ISO date (2006-08-20T00:00:00.000Z) -> DD/MM/YYYY.
-  // Timezone conversion nahi karte, sirf date portion lete hain.
-  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
-
-  if (iso) {
-    return `${iso[3]}/${iso[2]}/${iso[1]}`;
-  }
-
-  // DOB typed by hand (e.g. "21/05/2008" or "2008") - show exactly as saved.
-  return text || "-";
+function formatDOB(value) {
+  if (value === null || value === undefined) return "-";
+  const pad = n => String(n).padStart(2, "0");
+  const text = String(value).trim();
+  if (!text) return "-";
+  // 2006-08-20 / 2006-08-20T00:00:00.000Z -> 20/08/2006 (timezone convert nahi karte)
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (iso) return `${pad(iso[3])}/${pad(iso[2])}/${iso[1]}`;
+  // 21-05-2008, 21.5.2008, 21/05/2008 -> 21/05/2008
+  const dmy = text.match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})$/);
+  if (dmy) return `${pad(dmy[1])}/${pad(dmy[2])}/${dmy[3]}`;
+  // Sirf saal ("2008") ya koi aur text - jaisa saved hai waisa
+  return text;
 }
 
 /* ================= TABLE ================= */
