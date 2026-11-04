@@ -134,6 +134,21 @@
          the running-balance fields on it) instead of the raw record
          returned by the backend, which never had those fields.
     ============================================================
+    UPDATE: FEE HEADS CHANGE
+    ============================================================
+      1. Submit form se "Monthly Fee" input hata diya gaya. Per-month
+         fee student profile (ya pichhle payment) se automatically
+         aati hai. Fee kahin na mile tabhi box dikhta hai. Edit
+         modal me per-month fee abhi bhi badal sakte hain.
+      2. Tie Balance + Belt Balance ab ek input: "Tie & Belt Balance"
+         (field: additionalFees.tieBeltBalance). Purane records ke
+         alag tieBalance / beltBalance automatically isme jud kar
+         dikhte hain — totals / dues pehle jaise hi rehte hain.
+      3. NEW input: I-Card Fee      (additionalFees.idCardFee)
+      4. NEW input: One Year Exam Fee (additionalFees.oneYearExamFee)
+      Table, invoice, PDF, full-record PDF, WhatsApp aur Edit — sab
+      isi ek list (EXTRA_FEE_KEYS) se chalte hain.
+    ============================================================
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -1222,9 +1237,12 @@
                 <div class="card-title"><i class="fas fa-hand-holding-usd"></i> Submit Fee</div>
                 <form id="paymentForm">
                     <div class="form-grid">
-                        <div class="form-group">
+                        <!-- Monthly Fee input ab form me nahi dikhta: fee student profile se
+                             (ya pichhle payment se) automatically aati hai. Ye box sirf tab
+                             dikhega jab kahin se bhi fee na mile. -->
+                        <div class="form-group" id="monthlyFeeGroup" style="display:none;">
                             <label><i class="fas fa-money-bill"></i> Monthly Fee (per month)</label>
-                            <input type="number" id="monthlyFee" required min="0" placeholder="Enter monthly fee">
+                            <input type="number" id="monthlyFee" min="0" placeholder="Enter monthly fee">
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-rupee-sign"></i> Amount Paid</label>
@@ -1319,6 +1337,18 @@
 
 <div class="form-group">
     <label>
+        <i class="fas fa-calendar-check"></i> One Year Exam Fee
+    </label>
+    <input
+        type="number"
+        id="oneYearExamFee"
+        min="0"
+        value="0"
+        placeholder="One Year Exam Fee">
+</div>
+
+<div class="form-group">
+    <label>
         <i class="fas fa-heart"></i> Diary Fee
     </label>
     <input
@@ -1343,26 +1373,14 @@
 
 <div class="form-group">
     <label>
-        <i class="fas fa-tshirt"></i> Tie Balance
+        <i class="fas fa-user-tie"></i> Tie &amp; Belt Balance
     </label>
     <input
         type="number"
-        id="tieBalance"
+        id="tieBeltBalance"
         min="0"
         value="0"
-        placeholder="Tie Balance">
-</div>
-
-<div class="form-group">
-    <label>
-        <i class="fas fa-tshirt"></i> Belt Balance
-    </label>
-    <input
-        type="number"
-        id="beltBalance"
-        min="0"
-        value="0"
-        placeholder="Belt Balance">
+        placeholder="Tie &amp; Belt Balance">
 </div>
 
 <div class="form-group">
@@ -1375,6 +1393,18 @@
         min="0"
         value="0"
         placeholder="Shirt/Pant Balance">
+</div>
+
+<div class="form-group">
+    <label>
+        <i class="fas fa-id-badge"></i> I-Card Fee
+    </label>
+    <input
+        type="number"
+        id="idCardFee"
+        min="0"
+        value="0"
+        placeholder="I-Card Fee">
 </div>
                         <div class="form-group full">
                             <button type="submit" class="btn-submit" id="submitBtn">
@@ -1505,6 +1535,10 @@
                         <input type="number" id="edit_examFee" min="0" value="0">
                     </div>
                     <div class="form-group">
+                        <label><i class="fas fa-calendar-check"></i> One Year Exam Fee</label>
+                        <input type="number" id="edit_oneYearExamFee" min="0" value="0">
+                    </div>
+                    <div class="form-group">
                         <label><i class="fas fa-heart"></i> Diary Fee</label>
                         <input type="number" id="edit_redCrossFee" min="0" value="0">
                     </div>
@@ -1513,16 +1547,16 @@
                         <input type="number" id="edit_scoutFee" min="0" value="0">
                     </div>
                     <div class="form-group">
-                        <label><i class="fas fa-tshirt"></i> Tie Balance</label>
-                        <input type="number" id="edit_tieBalance" min="0" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-tshirt"></i> Belt Balance</label>
-                        <input type="number" id="edit_beltBalance" min="0" value="0">
+                        <label><i class="fas fa-user-tie"></i> Tie &amp; Belt Balance</label>
+                        <input type="number" id="edit_tieBeltBalance" min="0" value="0">
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-tshirt"></i> Shirt/Pant Balance</label>
                         <input type="number" id="edit_shirtPantBalance" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-id-badge"></i> I-Card Fee</label>
+                        <input type="number" id="edit_idCardFee" min="0" value="0">
                     </div>
             </div>
         </div>
@@ -1567,12 +1601,16 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
         bookFee: "Book Fee",
         stationaryFee: "Late Fine Fee",
         examFee: "Exam Fee",
+        oneYearExamFee: "One Year Exam Fee",
         redCrossFee: "Diary Fee",
         scoutFee: "Old Balance",
-        tieBalance: "Tie Balance",
-        beltBalance: "Belt Balance",
+        tieBeltBalance: "Tie & Belt Balance",
+        idCardFee: "I-Card Fee",
         shirtPantBalance: "Shirt/Pant Balance",
-        rteFee: "RTE Exam Fee"
+        rteFee: "RTE Exam Fee",
+        // legacy (purane records) — ab "tieBeltBalance" me jud kar dikhte hain
+        tieBalance: "Tie Balance",
+        beltBalance: "Belt Balance"
     };
 
     const EXTRA_FEE_EMOJI_LABELS = {
@@ -1581,13 +1619,65 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
         bookFee: "📚 Book",
         stationaryFee: "✏️ Stationary",
         examFee: "📝 Exam",
+        oneYearExamFee: "🗓️ One Year Exam",
         redCrossFee: "❤️ Diary",
         scoutFee: "🏦 Old Balance",
-        tieBalance: "👔 Tie",
-        beltBalance: "🎽 Belt",
+        tieBeltBalance: "👔 Tie & Belt",
+        idCardFee: "🪪 I-Card",
         shirtPantBalance: "👕 Shirt/Pant",
-        rteFee: "🆔 RTE Exam Fee"
+        rteFee: "🆔 RTE Exam Fee",
+        // legacy
+        tieBalance: "👔 Tie",
+        beltBalance: "🎽 Belt"
     };
+
+    // ==========================================================
+    // EVERY extra fee head that the Submit form / Edit form can
+    // write today (this order = order shown in table tooltip,
+    // invoice, PDF and WhatsApp). RTE Exam Fee is separate: it
+    // lives in transactionId, exactly as before.
+    // ==========================================================
+    const EXTRA_FEE_KEYS = [
+        "registrationFee",
+        "conveyanceFee",
+        "bookFee",
+        "stationaryFee",
+        "examFee",
+        "oneYearExamFee",
+        "redCrossFee",
+        "scoutFee",
+        "tieBeltBalance",
+        "idCardFee",
+        "shirtPantBalance"
+    ];
+
+    // Reads ONE fee head from a payment record.
+    // Purane records me Tie aur Belt alag-alag (tieBalance /
+    // beltBalance) save hain — unhe yaha "tieBeltBalance" me jod
+    // diya jata hai, taaki total / due pehle jaisa hi rahe aur
+    // table, invoice, PDF, WhatsApp, Edit — sab jagah ek hi
+    // "Tie & Belt Balance" dikhe.
+    function getExtraFeeValue(payment, key) {
+        const fees = payment.additionalFees || {};
+        const read = k => Number(fees[k] ?? payment[k]) || 0;
+
+        if (key === "tieBeltBalance") {
+            return read("tieBeltBalance") + read("tieBalance") + read("beltBalance");
+        }
+
+        return read(key);
+    }
+
+    // Reads every extra-fee input of the Submit form ("") or the
+    // Edit form ("edit_") into one additionalFees object.
+    function collectExtraFees(prefix) {
+        const fees = {};
+        EXTRA_FEE_KEYS.forEach(key => {
+            const el = document.getElementById(prefix + key);
+            fees[key] = Math.max(Number(el ? el.value : 0) || 0, 0);
+        });
+        return fees;
+    }
 
 
     // ==========================================================
@@ -1712,6 +1802,56 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
         return { selected, chargeable, skipped, perMonth, total, session };
     }
 
+    // ==========================================================
+    // MONTHLY FEE — AUTOMATIC
+    //
+    // "Monthly Fee" ka input ab Submit form me nahi dikhta. Per-month
+    // fee yaha se aati hai (is order me):
+    //   1. student profile  -> studentData.fees.monthlyFee
+    //   2. pichhla payment  -> jisme tuition charge hui thi
+    // Agar dono jagah fee nahi mili to hi Monthly Fee ka box dikhega,
+    // taaki fee kabhi 0 me na phas jaye. Baaki saari calculation
+    // (months x fee, already-billed months, running due) bilkul
+    // pehle jaisi hai. Purani transaction ki fee Edit me badli ja sakti hai.
+    // ==========================================================
+
+    function resolveAutoMonthlyFee() {
+
+        const fromProfile =
+            Number(studentData?.fees?.monthlyFee ?? studentData?.monthlyFee) || 0;
+
+        if (fromProfile > 0) {
+            return fromProfile;
+        }
+
+        for (let i = currentPayments.length - 1; i >= 0; i--) {
+            const p = currentPayments[i];
+            if ((Number(p._calculatedMonthlyFee) || 0) > 0 && (Number(p._perMonthFee) || 0) > 0) {
+                return Number(p._perMonthFee);
+            }
+        }
+
+        return 0;
+    }
+
+    function syncMonthlyFeeInput() {
+
+        const input = document.getElementById("monthlyFee");
+        const group = document.getElementById("monthlyFeeGroup");
+
+        if (!input || !group) return;
+
+        const fee = resolveAutoMonthlyFee();
+
+        if (fee > 0) {
+            input.value = fee;
+            group.style.display = "none";
+        } else {
+            // fee kahin nahi mili -> manual box dikhao
+            group.style.display = "";
+        }
+    }
+
     // ==========================================
     // LOAD STUDENT
     // ==========================================
@@ -1781,15 +1921,10 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
                 "-";
 
             // ==========================================
-            // SET MONTHLY FEE
+            // SET MONTHLY FEE (automatic — input hidden)
             // ==========================================
 
-            if (studentData.fees?.monthlyFee) {
-
-                document.getElementById("monthlyFee").value =
-                    studentData.fees.monthlyFee;
-
-            }
+            syncMonthlyFeeInput();
 
             // ==========================================
             // LOAD PAYMENT HISTORY
@@ -1904,18 +2039,7 @@ async function loadPayments() {
         // No fee field name is changed.
         // ==========================================================
 
-        const extraFeeKeys = [
-            "registrationFee",
-            "conveyanceFee",
-            "bookFee",
-            "stationaryFee",
-            "examFee",
-            "redCrossFee",
-            "scoutFee",
-            "tieBalance",
-            "beltBalance",
-            "shirtPantBalance"
-        ];
+        const extraFeeKeys = EXTRA_FEE_KEYS;
 
 
         // ==========================================================
@@ -2035,10 +2159,7 @@ async function loadPayments() {
             extraFeeKeys.forEach(key => {
 
                 const value =
-                    Number(
-                        additionalFees[key] ??
-                        payment[key]
-                    ) || 0;
+                    getExtraFeeValue(payment, key);
 
 
                 if (value > 0) {
@@ -2181,6 +2302,9 @@ async function loadPayments() {
         // ==========================================================
 
         currentPayments = calculatedPayments;
+
+        // automatic per-month fee (profile / last payment)
+        syncMonthlyFeeInput();
 
         // months already billed -> drives the chips in the Submit form
         billedMonthsAll = { ...monthlyFeeByMonth };
@@ -2505,20 +2629,9 @@ function buildInvoiceData(payment) {
     const monthlyFeeChargedThisSlip = monthlyFeeChargeAmount > 0;
 
     const extraFeeDefs = [
-        { key: "registrationFee", label: EXTRA_FEE_LABELS.registrationFee },
-        { key: "conveyanceFee", label: EXTRA_FEE_LABELS.conveyanceFee },
-        { key: "bookFee", label: EXTRA_FEE_LABELS.bookFee },
-        { key: "stationaryFee", label: EXTRA_FEE_LABELS.stationaryFee },
-        { key: "examFee", label: EXTRA_FEE_LABELS.examFee },
-        { key: "redCrossFee", label: EXTRA_FEE_LABELS.redCrossFee },
-        { key: "scoutFee", label: EXTRA_FEE_LABELS.scoutFee },
-        { key: "tieBalance", label: EXTRA_FEE_LABELS.tieBalance },
-        { key: "beltBalance", label: EXTRA_FEE_LABELS.beltBalance },
-        { key: "shirtPantBalance", label: EXTRA_FEE_LABELS.shirtPantBalance },
+        ...EXTRA_FEE_KEYS.map(key => ({ key: key, label: EXTRA_FEE_LABELS[key] })),
         { key: "rteFee", label: EXTRA_FEE_LABELS.rteFee, source: "transactionId" }
     ];
-
-    const additionalFees = payment.additionalFees || {};
 
     const extraFees = extraFeeDefs
         .map(f => {
@@ -2526,7 +2639,7 @@ function buildInvoiceData(payment) {
             if (f.source === "transactionId") {
                 value = Number(payment.transactionId) || 0;
             } else {
-                value = Number(additionalFees[f.key] ?? payment[f.key]) || 0;
+                value = getExtraFeeValue(payment, f.key);
             }
             return { key: f.key, label: f.label, value: value };
         })
@@ -2786,9 +2899,9 @@ function showToast(message) {
     function renderEmptyPayments() {
 
         billedMonthsAll = {};
-        updateMonthUI("main");
-
         currentPayments = [];
+        syncMonthlyFeeInput();
+        updateMonthUI("main");
 
         document.getElementById("paymentTable").innerHTML = `
 
@@ -2966,37 +3079,7 @@ if (!isoPaymentDate) {
     // MongoDB document shape (additionalFees: { registrationFee,
     // conveyanceFee, ... }), not flat top-level fields.
     // ==========================================================
-    additionalFees: {
-        registrationFee:
-            Number(document.getElementById("registrationFee").value) || 0,
-
-        conveyanceFee:
-            Number(document.getElementById("conveyanceFee").value) || 0,
-
-        bookFee:
-            Number(document.getElementById("bookFee").value) || 0,
-
-        stationaryFee:
-            Number(document.getElementById("stationaryFee").value) || 0,
-
-        examFee:
-            Number(document.getElementById("examFee").value) || 0,
-
-        redCrossFee:
-            Number(document.getElementById("redCrossFee").value) || 0,
-
-        scoutFee:
-            Number(document.getElementById("scoutFee").value) || 0,
-
-        tieBalance:
-            Number(document.getElementById("tieBalance").value) || 0,
-
-        beltBalance:
-            Number(document.getElementById("beltBalance").value) || 0,
-
-        shirtPantBalance:
-            Number(document.getElementById("shirtPantBalance").value) || 0
-    }
+    additionalFees: collectExtraFees("")
 };
 
 
@@ -4091,10 +4174,7 @@ function sendWhatsAppFromInvoice() {
 
     let editingPaymentId = null;
 
-    const EDIT_FEE_KEYS = [
-        "registrationFee", "conveyanceFee", "bookFee", "stationaryFee", "examFee",
-        "redCrossFee", "scoutFee", "tieBalance", "beltBalance", "shirtPantBalance"
-    ];
+    const EDIT_FEE_KEYS = EXTRA_FEE_KEYS;
 
     document.getElementById("edit_paymentDate").addEventListener("input", function () {
         let digits = this.value.replace(/\D/g, "").slice(0, 8);
@@ -4132,9 +4212,9 @@ function sendWhatsAppFromInvoice() {
             document.getElementById("edit_paymentDate").value = getTodayFormatted();
         }
 
-        const fees = payment.additionalFees || {};
+        // getExtraFeeValue merges old separate Tie + Belt into "Tie & Belt Balance"
         EDIT_FEE_KEYS.forEach(key => {
-            document.getElementById("edit_" + key).value = Number(fees[key]) || 0;
+            document.getElementById("edit_" + key).value = getExtraFeeValue(payment, key);
         });
 
         // edit modal shows the fee PER MONTH, and only treats months billed
@@ -4189,10 +4269,7 @@ function sendWhatsAppFromInvoice() {
             return;
         }
 
-        const additionalFees = {};
-        EDIT_FEE_KEYS.forEach(key => {
-            additionalFees[key] = Math.max(Number(document.getElementById("edit_" + key).value) || 0, 0);
-        });
+        const additionalFees = collectExtraFees("edit_");
 
         const body = {
             monthlyFee,
