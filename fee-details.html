@@ -136,10 +136,9 @@
     ============================================================
     UPDATE: FEE HEADS CHANGE
     ============================================================
-      1. Submit form se "Monthly Fee" input hata diya gaya. Per-month
-         fee student profile (ya pichhle payment) se automatically
-         aati hai. Fee kahin na mile tabhi box dikhta hai. Edit
-         modal me per-month fee abhi bhi badal sakte hain.
+      1. "Monthly Fee (per month)" form me dikhta hai, student profile
+         (ya pichhle payment) se auto-fill hota hai aur yahin se edit
+         bhi hota hai. Invoice / PDF me "Per Month Fee" bhi aata hai.
       2. Tie Balance + Belt Balance ab ek input: "Tie & Belt Balance"
          (field: additionalFees.tieBeltBalance). Purane records ke
          alag tieBalance / beltBalance automatically isme jud kar
@@ -148,6 +147,8 @@
       4. NEW input: One Year Exam Fee (additionalFees.oneYearExamFee)
       Table, invoice, PDF, full-record PDF, WhatsApp aur Edit — sab
       isi ek list (EXTRA_FEE_KEYS) se chalte hain.
+      Invoice preview / PDF / WhatsApp me "Extra Charges Total" alag
+      se aata hai, aur New Charges / Due me bhi judta hai.
     ============================================================
 -->
 <!DOCTYPE html>
@@ -1237,12 +1238,12 @@
                 <div class="card-title"><i class="fas fa-hand-holding-usd"></i> Submit Fee</div>
                 <form id="paymentForm">
                     <div class="form-grid">
-                        <!-- Monthly Fee input ab form me nahi dikhta: fee student profile se
-                             (ya pichhle payment se) automatically aati hai. Ye box sirf tab
-                             dikhega jab kahin se bhi fee na mile. -->
-                        <div class="form-group" id="monthlyFeeGroup" style="display:none;">
+                        <!-- Per-month fee: student profile (ya pichhle payment) se automatically
+                             bhar jaati hai, yahin dikhti hai aur yahin se edit bhi hoti hai. -->
+                        <div class="form-group" id="monthlyFeeGroup">
                             <label><i class="fas fa-money-bill"></i> Monthly Fee (per month)</label>
                             <input type="number" id="monthlyFee" min="0" placeholder="Enter monthly fee">
+                            <small id="monthlyFeeSource" style="display:block;margin-top:4px;font-size:11.5px;color:#9a8868;"></small>
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-rupee-sign"></i> Amount Paid</label>
@@ -1803,17 +1804,19 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
     }
 
     // ==========================================================
-    // MONTHLY FEE — AUTOMATIC
+    // MONTHLY FEE (per month) — auto-filled, visible, editable
     //
-    // "Monthly Fee" ka input ab Submit form me nahi dikhta. Per-month
-    // fee yaha se aati hai (is order me):
+    // Per-month fee form me hamesha dikhti hai. Value is order me
+    // apne-aap bhar jaati hai:
     //   1. student profile  -> studentData.fees.monthlyFee
     //   2. pichhla payment  -> jisme tuition charge hui thi
-    // Agar dono jagah fee nahi mili to hi Monthly Fee ka box dikhega,
-    // taaki fee kabhi 0 me na phas jaye. Baaki saari calculation
-    // (months x fee, already-billed months, running due) bilkul
-    // pehle jaisi hai. Purani transaction ki fee Edit me badli ja sakti hai.
+    // Uske neeche likha aata hai ki fee kahan se aayi. Is box me
+    // value badal sakte ho — badalne ke baad wo aapki value hi
+    // rehti hai (auto-fill use overwrite nahi karta). Purani
+    // transaction ki fee Edit modal se badal sakte ho.
     // ==========================================================
+
+    let monthlyFeeTouched = false;
 
     function resolveAutoMonthlyFee() {
 
@@ -1821,36 +1824,42 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
             Number(studentData?.fees?.monthlyFee ?? studentData?.monthlyFee) || 0;
 
         if (fromProfile > 0) {
-            return fromProfile;
+            return { fee: fromProfile, source: "student profile se" };
         }
 
         for (let i = currentPayments.length - 1; i >= 0; i--) {
             const p = currentPayments[i];
             if ((Number(p._calculatedMonthlyFee) || 0) > 0 && (Number(p._perMonthFee) || 0) > 0) {
-                return Number(p._perMonthFee);
+                return { fee: Number(p._perMonthFee), source: "pichhle payment se" };
             }
         }
 
-        return 0;
+        return { fee: 0, source: "" };
     }
 
     function syncMonthlyFeeInput() {
 
         const input = document.getElementById("monthlyFee");
-        const group = document.getElementById("monthlyFeeGroup");
+        const note = document.getElementById("monthlyFeeSource");
 
-        if (!input || !group) return;
+        if (!input) return;
 
-        const fee = resolveAutoMonthlyFee();
+        const r = resolveAutoMonthlyFee();
 
-        if (fee > 0) {
-            input.value = fee;
-            group.style.display = "none";
-        } else {
-            // fee kahin nahi mili -> manual box dikhao
-            group.style.display = "";
+        if (!monthlyFeeTouched && r.fee > 0) {
+            input.value = r.fee;
+        }
+
+        if (note) {
+            note.textContent = r.fee > 0
+                ? `Auto: ₹${r.fee} per month (${r.source}) — yahin se badal sakte ho`
+                : "Fee set nahi hai — per month fee yahan daalein";
         }
     }
+
+    document.getElementById("monthlyFee").addEventListener("input", function () {
+        monthlyFeeTouched = true;
+    });
 
     // ==========================================
     // LOAD STUDENT
@@ -1921,7 +1930,7 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
                 "-";
 
             // ==========================================
-            // SET MONTHLY FEE (automatic — input hidden)
+            // SET MONTHLY FEE (auto-fill, visible + editable)
             // ==========================================
 
             syncMonthlyFeeInput();
@@ -2675,6 +2684,11 @@ function buildInvoiceData(payment) {
 
     const monthsArr = payment._months || parsePaymentMonths(payment);
 
+    // Per-month tuition fee (shown on form, invoice, PDF)
+    const perMonthFee =
+        Number(payment._perMonthFee) ||
+        (monthsArr.length ? Math.round((displayMonthlyFee / monthsArr.length) * 100) / 100 : 0);
+
     const monthBreakdown = payment._monthBreakdown ||
         monthsArr.map(m => ({
             month: m,
@@ -2700,6 +2714,7 @@ function buildInvoiceData(payment) {
         transactionId: payment.transactionId || "-",
         paid,
         monthlyFee: displayMonthlyFee,
+        perMonthFee,
         monthlyFeeChargedThisSlip,
         monthlyFeeChargeAmount,
         previousDue,
@@ -2776,7 +2791,7 @@ function generateWhatsAppMessage(student, payment) {
 ${extraText ? `📋 *New Additional Fees (this slip):*\n${extraText}` : '📋 *New Additional Fees:* None'}
 
 ━━━━━━━━━━━━━━━━━━━
-${info.previousDue > 0 ? `📌 *Previous Balance:* ₹${info.previousDue}\n` : ''}💵 *New Charges (this slip):* ₹${info.newChargeThisSlip}
+${info.previousDue > 0 ? `📌 *Previous Balance:* ₹${info.previousDue}\n` : ''}${info.extraFeesTotal > 0 ? `➕ *Extra Charges Total:* ₹${info.extraFeesTotal}\n` : ''}💵 *New Charges (this slip):* ₹${info.newChargeThisSlip}
 💳 *Amount Paid:* ₹${info.paid}
 📊 *Remaining Due:* ₹${info.due}
 
@@ -3368,6 +3383,7 @@ if (!isoPaymentDate) {
             <div class="invoice-grid">
                 <div class="invoice-row"><span class="label">Month${info.months.length > 1 ? "s" : ""}</span><span class="value">${info.month}</span></div>
                 <div class="invoice-row"><span class="label">Monthly Fee (${info.months.length > 1 ? info.months.length + " months" : "this month"})</span><span class="value">₹${monthlyFee}</span></div>
+                <div class="invoice-row"><span class="label">Per Month Fee</span><span class="value">₹${info.perMonthFee}</span></div>
                 <div class="invoice-row"><span class="label">Payment Date</span><span class="value">${date}</span></div>
                 <div class="invoice-row"><span class="label">Payment Mode</span><span class="value">${payment.paymentMode || "-"}</span></div>
                 <div class="invoice-row"><span class="label">RTE Exam Fee</span><span class="value">${payment.transactionId || "-"}</span></div>
@@ -3382,6 +3398,8 @@ if (!isoPaymentDate) {
                     ${itemRows}
                 </tbody>
                 <tfoot>
+                    ${monthlyFeeChargedThisSlip ? `<tr><td>Tuition Fee (this slip)</td><td>₹${info.monthlyFeeChargeAmount}</td></tr>` : ""}
+                    ${extraFees.length ? `<tr><td>Extra Charges Total</td><td>₹${info.extraFeesTotal}</td></tr>` : ""}
                     <tr><td>New Charges (this slip)</td><td>₹${newChargeThisSlip}</td></tr>
                 </tfoot>
             </table>
@@ -3795,6 +3813,14 @@ function sendWhatsAppFromInvoice() {
             y
         );
 
+        detailRow(
+            "Per Month:",
+            `Rs. ${info.perMonthFee}`,
+            col2LabelX,
+            col2ValueX,
+            y
+        );
+
         // Student ID + Phone
         y += 20;
 
@@ -3832,10 +3858,15 @@ function sendWhatsAppFromInvoice() {
         const feeItems = [
             ...(info.monthBreakdown.length > 1
                 ? info.monthBreakdown.map(b => ({
-                    label: `Tuition Fee (${b.month})${b.chargedNow ? "" : " - billed earlier"}`,
-                    value: b.fee
+                    label: `Tuition Fee (${b.month})`,
+                    value: b.fee,
+                    earlier: !b.chargedNow
                   }))
-                : [{ label: `Monthly Tuition Fee (${info.month})`, value: info.monthlyFee }]),
+                : [{
+                    label: `Monthly Tuition Fee (${info.month})`,
+                    value: info.monthlyFee,
+                    earlier: !info.monthlyFeeChargedThisSlip
+                  }]),
             ...info.extraFees
         ];
 
@@ -3844,7 +3875,14 @@ function sendWhatsAppFromInvoice() {
         doc.setDrawColor(...colors.line);
         doc.setLineWidth(0.5);
 
+        const pdfPageH = doc.internal.pageSize.getHeight();
+
         feeItems.forEach((item) => {
+
+            if (y + 24 > pdfPageH - 70) {
+                doc.addPage();
+                y = 40;
+            }
 
             y += 18;
 
@@ -3860,8 +3898,10 @@ function sendWhatsAppFromInvoice() {
 
             doc.setTextColor(...colors.dark);
 
+            // "billed earlier" = fee pehle hi charge ho chuki hai, is slip ke
+            // New Charges me nahi judti (sirf reference ke liye dikhai gayi)
             doc.text(
-                `Rs. ${item.value}`,
+                item.earlier ? `Rs. ${item.value} (billed earlier)` : `Rs. ${item.value}`,
                 pageWidth - marginX,
                 y,
                 { align: "right" }
@@ -3875,11 +3915,43 @@ function sendWhatsAppFromInvoice() {
             );
         });
 
+        // Extra Charges Total — saare extra fee heads ka total, alag line me
+        if (info.extraFees.length) {
+
+            if (y + 24 > pdfPageH - 70) {
+                doc.addPage();
+                y = 40;
+            }
+
+            y += 20;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.dark);
+
+            doc.text("Extra Charges Total", marginX + 8, y);
+
+            doc.text(
+                `Rs. ${info.extraFeesTotal}`,
+                pageWidth - marginX,
+                y,
+                { align: "right" }
+            );
+
+            doc.line(marginX, y + 6, pageWidth - marginX, y + 6);
+        }
+
         // =====================================================
         // AMOUNT SUMMARY
         // =====================================================
 
         y += 40;
+
+        // summary + status + signature + footer need roughly this much room
+        if (y + 330 > pdfPageH) {
+            doc.addPage();
+            y = 60;
+        }
 
         const amtLabelX = pageWidth - marginX - 150;
         const amtValueX = pageWidth - marginX;
@@ -3918,6 +3990,16 @@ function sendWhatsAppFromInvoice() {
 
         if (info.previousDue > 0) {
             amountRow("Previous Balance (B/F) :", info.previousDue, amtY);
+            amtY += 22;
+        }
+
+        if (info.monthlyFeeChargedThisSlip) {
+            amountRow("Tuition Fee (this slip) :", info.monthlyFeeChargeAmount, amtY);
+            amtY += 22;
+        }
+
+        if (info.extraFeesTotal > 0) {
+            amountRow("Extra Charges :", info.extraFeesTotal, amtY);
             amtY += 22;
         }
 
@@ -4627,7 +4709,13 @@ function sendWhatsAppFromInvoice() {
                 });
             });
 
-            const headRows = [["Monthly Tuition Fee", monthlyTotal], ...Object.entries(headTotals)];
+            const extraGrandTotal = Object.values(headTotals).reduce((s, v) => s + v, 0);
+
+            const headRows = [
+                ["Monthly Tuition Fee", monthlyTotal],
+                ...Object.entries(headTotals),
+                ["Total Extra Charges", extraGrandTotal]
+            ];
 
             y += 22;
 
