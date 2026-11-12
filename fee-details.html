@@ -1211,7 +1211,8 @@
                         <thead>
                             <tr>
                                 <th>Month</th>
-                                <th>Monthly Fee</th>
+                                <th>Monthly Fee (Total)</th>
+                                <th>Per Month Fee</th>
                                 <th>Extra Fees</th>
                                 <th>Amount Paid</th>
                                 <th>Due</th>
@@ -1223,7 +1224,7 @@
                         </thead>
                         <tbody id="paymentTable">
                             <tr>
-                                <td colspan="9" class="no-records">
+                                <td colspan="10" class="no-records">
                                     <i class="fas fa-receipt"></i>
                                     No fee payments found.
                                 </td>
@@ -1667,6 +1668,27 @@ const ADMIN_PHONE = "9259695556"; // 👈 YEH LINE ADD KAREIN
         }
 
         return read(key);
+    }
+
+    // Save ke baad check: jo fee bheji thi wo server ne sach me save ki ya nahi.
+    // Agar server (Render) purana hai to wo naye fee fields chupchap hata deta hai.
+    function warnIfServerDroppedFees(sentFees, savedPayment) {
+        const saved = (savedPayment && savedPayment.additionalFees) || {};
+        const dropped = EXTRA_FEE_KEYS.filter(k =>
+            k !== "tieBeltBalance" &&
+            (Number(sentFees[k]) || 0) > 0 &&
+            (Number(saved[k]) || 0) !== (Number(sentFees[k]) || 0)
+        );
+        if (dropped.length) {
+            alert(
+                "⚠️ Server ne ye fee save NAHI ki: " +
+                dropped.map(k => EXTRA_FEE_LABELS[k] || k).join(", ") +
+                "\n\nRender par purana server.js / models/Payment.js chal raha hai. " +
+                "Naya server.js aur models/Payment.js deploy karo (redeploy), phir dobara fee add karo."
+            );
+            return true;
+        }
+        return false;
     }
 
     // Reads every extra-fee input of the Submit form ("") or the
@@ -2439,6 +2461,7 @@ async function loadPayments() {
                         payment.paymentMode,
                         status,
                         monthlyFee,
+                        payment._perMonthFee || 0,
                         paid,
                         due,
                         extraFeesTotal,
@@ -2462,9 +2485,19 @@ async function loadPayments() {
                                 ₹${monthlyFee}
                             </td>
 
+                            <td title="${monthTitle}">
+                                ₹${payment._perMonthFee || 0}
+                                ${(payment._months || []).length > 1
+                                    ? `<div style="font-size:11px;color:#9a8868;">x ${payment._months.length} months</div>`
+                                    : ""}
+                            </td>
+
                             <td
                                 title="${extraFeesTitle}">
-                                ₹${extraFeesTotal}
+                                <strong>₹${extraFeesTotal}</strong>
+                                ${extraFeeParts.map(part =>
+                                    `<div style="font-size:11px;color:#7a6a50;line-height:1.5;white-space:nowrap;">${part}</div>`
+                                ).join("")}
                             </td>
 
                             <td>
@@ -2923,7 +2956,7 @@ function showToast(message) {
             <tr>
 
                 <td
-                    colspan="9"
+                    colspan="10"
                     class="no-records"
                 >
 
@@ -3176,7 +3209,9 @@ if (!isoPaymentDate) {
                     // SUCCESS
                     // ==========================================
 
-                    alert("✅ Fee submitted successfully!");
+                    if (!warnIfServerDroppedFees(paymentData.additionalFees, data.payment)) {
+                        alert("✅ Fee submitted successfully!");
+                    }
 
                     // ==========================================================
                     // Refresh payment history FIRST so the WhatsApp message
@@ -4230,7 +4265,7 @@ function sendWhatsAppFromInvoice() {
         if (rows.length && tokens.length && visible === 0) {
             const tr = document.createElement("tr");
             tr.id = "noMatchRow";
-            tr.innerHTML = `<td colspan="9" class="no-records">
+            tr.innerHTML = `<td colspan="10" class="no-records">
                 <i class="fas fa-search"></i> No fee record matches "${query.replace(/</g, "&lt;")}"</td>`;
             tbody.appendChild(tr);
         }
@@ -4384,7 +4419,9 @@ function sendWhatsAppFromInvoice() {
             } else {
                 closeEditPayment();
                 await loadPayments();
-                alert("✅ Fee transaction updated successfully!");
+                if (!warnIfServerDroppedFees(additionalFees, data.payment)) {
+                    alert("✅ Fee transaction updated successfully!");
+                }
             }
 
         } catch (error) {
