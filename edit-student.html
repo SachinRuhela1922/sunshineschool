@@ -480,6 +480,63 @@
                 justify-content: center;
             }
         }
+
+        /* ===== Parent Aadhaar image upload ===== */
+        .aadhaar-upload {
+            border: 1.5px dashed #ecd9c0;
+            border-radius: 18px;
+            padding: 0.8rem;
+            background: #fffaf4;
+        }
+        .aadhaar-upload input[type="file"] {
+            width: 100%;
+            font-size: 0.85rem;
+            padding: 0.45rem;
+            background: #fff;
+            cursor: pointer;
+        }
+        .aadhaar-note {
+            display: block;
+            margin-top: 0.4rem;
+            font-size: 0.72rem;
+            color: #b09a7e;
+        }
+        .aadhaar-preview {
+            display: none;
+            align-items: center;
+            gap: 0.8rem;
+            margin-top: 0.7rem;
+        }
+        .aadhaar-preview.show { display: flex; }
+        .aadhaar-preview img {
+            width: 96px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #eadcc8;
+            background: #fff;
+            cursor: zoom-in;
+        }
+        .aadhaar-status {
+            flex: 1;
+            font-size: 0.8rem;
+            color: #8a6d46;
+        }
+        .aadhaar-status.ok { color: #2e8b57; }
+        .aadhaar-status.error { color: #c0392b; }
+        .aadhaar-remove {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border: none;
+            background: #fdecea;
+            color: #c0392b;
+            border-radius: 12px;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+        .aadhaar-remove:hover { background: #fadbd7; }
     </style>
 </head>
 
@@ -655,6 +712,30 @@
                             <label><i class="fas fa-phone"></i> Guardian Phone</label>
                             <input type="tel" id="guardianPhone" placeholder="+91 98765 43210">
                         </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Father Aadhaar Card (Image)</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="fatherAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="fatherAadhaarPreview">
+                                    <img id="fatherAadhaarImg" alt="Father Aadhaar card" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="fatherAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="fatherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Mother Aadhaar Card (Image)</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="motherAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="motherAadhaarPreview">
+                                    <img id="motherAadhaarImg" alt="Mother Aadhaar card" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="motherAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="motherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -707,6 +788,18 @@
                         <div class="form-group">
                             <label><i class="fas fa-id-card"></i> Aadhaar Number</label>
                             <input type="text" id="aadhaarNumber" placeholder="1234 5678 9012">
+                        </div>
+                        <div class="form-group full">
+                            <label><i class="fas fa-id-card"></i> Student Aadhaar Card (Image)</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="studentAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="studentAadhaarPreview">
+                                    <img id="studentAadhaarImg" alt="Student Aadhaar card" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="studentAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="studentAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -848,6 +941,10 @@
             document.getElementById("motherName").value = student.mother?.name || "";
             document.getElementById("motherPhone").value = student.mother?.phone || "";
 
+            // Aadhaar card images (Cloudinary)
+            setAadhaarImage("father", student.father?.aadhaarImage);
+            setAadhaarImage("mother", student.mother?.aadhaarImage);
+
             // Guardian
             document.getElementById("guardianName").value = student.guardian?.name || "";
             document.getElementById("guardianRelation").value = student.guardian?.relation || "";
@@ -866,6 +963,7 @@
 
             // Documents - Aadhaar Number
             document.getElementById("aadhaarNumber").value = student.documents?.aadhaarNumber || "";
+            setAadhaarImage("student", student.documents?.aadhaarImage);
 
             // Status
             document.getElementById("status").value = student.status || "active";
@@ -876,6 +974,135 @@
             message.className = "message show error";
         }
     }
+
+    // ==========================================
+    // PARENT AADHAAR IMAGE UPLOAD (Cloudinary)
+    // Image choose karte hi server par upload hoti hai,
+    // aur form save hone par uska URL student ke saath save hota hai.
+    // ==========================================
+    const AADHAAR_UPLOAD_URL = "https://sunshine-vtal.onrender.com/api/upload/aadhaar";
+    const aadhaarState = { father: null, mother: null, student: null };
+    let aadhaarUploading = 0;
+
+    function paintAadhaar(who, src, text, kind, canRemove) {
+        const box = document.getElementById(who + "AadhaarPreview");
+        const img = document.getElementById(who + "AadhaarImg");
+        const status = document.getElementById(who + "AadhaarStatus");
+        const rm = document.getElementById(who + "AadhaarRemove");
+
+        if (!src && !text) {
+            box.classList.remove("show");
+            img.removeAttribute("src");
+            img.style.display = "none";
+            rm.style.display = "none";
+            status.textContent = "";
+            return;
+        }
+
+        box.classList.add("show");
+
+        if (src) {
+            img.src = src;
+            img.style.display = "block";
+        } else {
+            img.removeAttribute("src");
+            img.style.display = "none";
+        }
+
+        status.textContent = text || "";
+        status.className = "aadhaar-status" + (kind ? " " + kind : "");
+        rm.style.display = canRemove ? "inline-flex" : "none";
+    }
+
+    // Saved image dikhao (ya null dene par saaf karo)
+    function setAadhaarImage(who, image) {
+        aadhaarState[who] = image && image.url
+            ? { url: image.url, publicId: image.publicId || "" }
+            : null;
+
+        const input = document.getElementById(who + "AadhaarFile");
+        if (input) input.value = "";
+
+        if (aadhaarState[who]) {
+            paintAadhaar(who, aadhaarState[who].url, "Saved ✓", "ok", true);
+        } else {
+            paintAadhaar(who, "", "", "", false);
+        }
+    }
+
+    function setupAadhaarUploader(who) {
+        const input = document.getElementById(who + "AadhaarFile");
+
+        input.addEventListener("change", async function () {
+            const file = input.files[0];
+            if (!file) return;
+
+            const previous = aadhaarState[who];
+
+            const restorePrevious = (errorText) => {
+                input.value = "";
+                if (previous) {
+                    paintAadhaar(who, previous.url, errorText, "error", true);
+                } else {
+                    paintAadhaar(who, "", errorText, "error", false);
+                }
+            };
+
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+                restorePrevious("Only JPG, PNG or WEBP images are allowed.");
+                return;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                restorePrevious("Image must be smaller than 5 MB.");
+                return;
+            }
+
+            const localUrl = URL.createObjectURL(file);
+            paintAadhaar(who, localUrl, "Uploading...", "", false);
+            aadhaarUploading++;
+
+            try {
+                const formData = new FormData();
+                formData.append("aadhaar", file);
+
+                const response = await fetch(AADHAAR_UPLOAD_URL, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || "Upload failed.");
+                }
+
+                aadhaarState[who] = { url: data.url, publicId: data.publicId };
+                input.value = "";
+                paintAadhaar(who, data.url, "Uploaded ✓", "ok", true);
+
+            } catch (error) {
+                console.error(error);
+                restorePrevious(error.message || "Upload failed. Please try again.");
+            } finally {
+                aadhaarUploading--;
+                URL.revokeObjectURL(localUrl);
+            }
+        });
+
+        document.getElementById(who + "AadhaarRemove").addEventListener("click", function () {
+            setAadhaarImage(who, null);
+        });
+
+        document.getElementById(who + "AadhaarImg").addEventListener("click", function () {
+            if (aadhaarState[who]) {
+                window.open(aadhaarState[who].url, "_blank", "noopener");
+            }
+        });
+    }
+
+    setupAadhaarUploader("father");
+    setupAadhaarUploader("mother");
+    setupAadhaarUploader("student");
 
     // ==========================================
     // SIDEBAR NAVIGATION
@@ -907,6 +1134,12 @@
     form.addEventListener("submit", async function(e) {
         e.preventDefault();
 
+        if (aadhaarUploading > 0) {
+            message.textContent = "⏳ Aadhaar image is still uploading. Please wait a moment and save again.";
+            message.className = "message show info";
+            return;
+        }
+
         const updatedStudent = {
             studentName: document.getElementById("studentName").value,
             admissionNumber: document.getElementById("admissionNumber").value,
@@ -928,11 +1161,13 @@
             father: {
                 name: document.getElementById("fatherName").value,
                 phone: document.getElementById("fatherPhone").value,
-                occupation: document.getElementById("fatherOccupation").value
+                occupation: document.getElementById("fatherOccupation").value,
+                ...(aadhaarState.father ? { aadhaarImage: aadhaarState.father } : {})
             },
             mother: {
                 name: document.getElementById("motherName").value,
-                phone: document.getElementById("motherPhone").value
+                phone: document.getElementById("motherPhone").value,
+                ...(aadhaarState.mother ? { aadhaarImage: aadhaarState.mother } : {})
             },
             guardian: {
                 name: document.getElementById("guardianName").value,
@@ -951,7 +1186,8 @@
                 transactionId: document.getElementById("transactionId").value
             },
             documents: {
-                aadhaarNumber: document.getElementById("aadhaarNumber").value
+                aadhaarNumber: document.getElementById("aadhaarNumber").value,
+                ...(aadhaarState.student ? { aadhaarImage: aadhaarState.student } : {})
             },
             // Medical fields (kept for backward compatibility)
             medical: {
