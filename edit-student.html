@@ -713,11 +713,11 @@
                             <input type="tel" id="guardianPhone" placeholder="+91 98765 43210">
                         </div>
                         <div class="form-group">
-                            <label><i class="fas fa-id-card"></i> Father Aadhaar Card (Image)</label>
+                            <label><i class="fas fa-id-card"></i> Father Aadhaar Card - Front</label>
                             <div class="aadhaar-upload">
                                 <input type="file" id="fatherAadhaarFile" accept="image/jpeg,image/png,image/webp">
                                 <div class="aadhaar-preview" id="fatherAadhaarPreview">
-                                    <img id="fatherAadhaarImg" alt="Father Aadhaar card" title="Click to view full size" style="display:none">
+                                    <img id="fatherAadhaarImg" alt="Father Aadhaar Card - Front" title="Click to view full size" style="display:none">
                                     <span class="aadhaar-status" id="fatherAadhaarStatus"></span>
                                     <button type="button" class="aadhaar-remove" id="fatherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                                 </div>
@@ -725,13 +725,37 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label><i class="fas fa-id-card"></i> Mother Aadhaar Card (Image)</label>
+                            <label><i class="fas fa-id-card"></i> Father Aadhaar Card - Back</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="fatherBackAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="fatherBackAadhaarPreview">
+                                    <img id="fatherBackAadhaarImg" alt="Father Aadhaar Card - Back" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="fatherBackAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="fatherBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Mother Aadhaar Card - Front</label>
                             <div class="aadhaar-upload">
                                 <input type="file" id="motherAadhaarFile" accept="image/jpeg,image/png,image/webp">
                                 <div class="aadhaar-preview" id="motherAadhaarPreview">
-                                    <img id="motherAadhaarImg" alt="Mother Aadhaar card" title="Click to view full size" style="display:none">
+                                    <img id="motherAadhaarImg" alt="Mother Aadhaar Card - Front" title="Click to view full size" style="display:none">
                                     <span class="aadhaar-status" id="motherAadhaarStatus"></span>
                                     <button type="button" class="aadhaar-remove" id="motherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Mother Aadhaar Card - Back</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="motherBackAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="motherBackAadhaarPreview">
+                                    <img id="motherBackAadhaarImg" alt="Mother Aadhaar Card - Back" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="motherBackAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="motherBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                                 </div>
                                 <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
                             </div>
@@ -789,14 +813,26 @@
                             <label><i class="fas fa-id-card"></i> Aadhaar Number</label>
                             <input type="text" id="aadhaarNumber" placeholder="1234 5678 9012">
                         </div>
-                        <div class="form-group full">
-                            <label><i class="fas fa-id-card"></i> Student Aadhaar Card (Image)</label>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Student Aadhaar Card - Front</label>
                             <div class="aadhaar-upload">
                                 <input type="file" id="studentAadhaarFile" accept="image/jpeg,image/png,image/webp">
                                 <div class="aadhaar-preview" id="studentAadhaarPreview">
-                                    <img id="studentAadhaarImg" alt="Student Aadhaar card" title="Click to view full size" style="display:none">
+                                    <img id="studentAadhaarImg" alt="Student Aadhaar Card - Front" title="Click to view full size" style="display:none">
                                     <span class="aadhaar-status" id="studentAadhaarStatus"></span>
                                     <button type="button" class="aadhaar-remove" id="studentAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                                </div>
+                                <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Student Aadhaar Card - Back</label>
+                            <div class="aadhaar-upload">
+                                <input type="file" id="studentBackAadhaarFile" accept="image/jpeg,image/png,image/webp">
+                                <div class="aadhaar-preview" id="studentBackAadhaarPreview">
+                                    <img id="studentBackAadhaarImg" alt="Student Aadhaar Card - Back" title="Click to view full size" style="display:none">
+                                    <span class="aadhaar-status" id="studentBackAadhaarStatus"></span>
+                                    <button type="button" class="aadhaar-remove" id="studentBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                                 </div>
                                 <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
                             </div>
@@ -964,6 +1000,9 @@
             // Documents - Aadhaar Number
             document.getElementById("aadhaarNumber").value = student.documents?.aadhaarNumber || "";
             setAadhaarImage("student", student.documents?.aadhaarImage);
+            setAadhaarImage("fatherBack", student.father?.aadhaarBackImage);
+            setAadhaarImage("motherBack", student.mother?.aadhaarBackImage);
+            setAadhaarImage("studentBack", student.documents?.aadhaarBackImage);
 
             // Status
             document.getElementById("status").value = student.status || "active";
@@ -981,7 +1020,7 @@
     // aur form save hone par uska URL student ke saath save hota hai.
     // ==========================================
     const AADHAAR_UPLOAD_URL = "https://sunshine-vtal.onrender.com/api/upload/aadhaar";
-    const aadhaarState = { father: null, mother: null, student: null };
+    const aadhaarState = { father: null, fatherBack: null, mother: null, motherBack: null, student: null, studentBack: null };
     let aadhaarUploading = 0;
 
     function paintAadhaar(who, src, text, kind, canRemove) {
@@ -1103,6 +1142,9 @@
     setupAadhaarUploader("father");
     setupAadhaarUploader("mother");
     setupAadhaarUploader("student");
+    setupAadhaarUploader("fatherBack");
+    setupAadhaarUploader("motherBack");
+    setupAadhaarUploader("studentBack");
 
     // ==========================================
     // SIDEBAR NAVIGATION
@@ -1162,12 +1204,14 @@
                 name: document.getElementById("fatherName").value,
                 phone: document.getElementById("fatherPhone").value,
                 occupation: document.getElementById("fatherOccupation").value,
-                ...(aadhaarState.father ? { aadhaarImage: aadhaarState.father } : {})
+                ...(aadhaarState.father ? { aadhaarImage: aadhaarState.father } : {}),
+                ...(aadhaarState.fatherBack ? { aadhaarBackImage: aadhaarState.fatherBack } : {})
             },
             mother: {
                 name: document.getElementById("motherName").value,
                 phone: document.getElementById("motherPhone").value,
-                ...(aadhaarState.mother ? { aadhaarImage: aadhaarState.mother } : {})
+                ...(aadhaarState.mother ? { aadhaarImage: aadhaarState.mother } : {}),
+                ...(aadhaarState.motherBack ? { aadhaarBackImage: aadhaarState.motherBack } : {})
             },
             guardian: {
                 name: document.getElementById("guardianName").value,
@@ -1187,7 +1231,8 @@
             },
             documents: {
                 aadhaarNumber: document.getElementById("aadhaarNumber").value,
-                ...(aadhaarState.student ? { aadhaarImage: aadhaarState.student } : {})
+                ...(aadhaarState.student ? { aadhaarImage: aadhaarState.student } : {}),
+                ...(aadhaarState.studentBack ? { aadhaarBackImage: aadhaarState.studentBack } : {})
             },
             // Medical fields (kept for backward compatibility)
             medical: {

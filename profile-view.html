@@ -420,6 +420,19 @@
             text-decoration: none;
         }
         .aadhaar-modal-actions a:hover { text-decoration: underline; }
+        .aadhaar-flip {
+            align-items: center;
+            gap: 0.35rem;
+            border: 1px solid #f3d9b8;
+            background: #fff7ec;
+            color: #b8650f;
+            border-radius: 10px;
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .aadhaar-flip:hover { background: #fdebd2; }
         .aadhaar-modal-close {
             border: none;
             background: #f5efe6;
@@ -490,6 +503,7 @@
         <div class="aadhaar-modal-head">
             <span id="aadhaarModalTitle"><i class="fas fa-id-card"></i> Aadhaar Card</span>
             <span class="aadhaar-modal-actions">
+                <button type="button" class="aadhaar-flip" id="aadhaarModalFlip" style="display:none"></button>
                 <a id="aadhaarModalOpen" href="#" target="_blank" rel="noopener"><i class="fas fa-up-right-from-square"></i> Open in new tab</a>
                 <button type="button" class="aadhaar-modal-close" onclick="closeAadhaarModal()" aria-label="Close">&times;</button>
             </span>
@@ -505,14 +519,29 @@
     // AADHAAR VIEWER (lightbox)
     // ==========================================
 
-    const aadhaarImages = { father: "", mother: "", student: "" };
+    const aadhaarImages = { father: "", fatherBack: "", mother: "", motherBack: "", student: "", studentBack: "" };
 
     function openAadhaarModal(who) {
         const url = aadhaarImages[who];
         if (!url) return;
 
+        const owner = who.replace("Back", "");
+        const isBack = who.endsWith("Back");
+        const ownerName = { father: "Father", mother: "Mother", student: "Student" }[owner] || "";
+
         document.getElementById("aadhaarModalTitle").innerHTML =
-            '<i class="fas fa-id-card"></i> ' + ({ father: "Father", mother: "Mother", student: "Student" }[who] || "") + " Aadhaar Card";
+            '<i class="fas fa-id-card"></i> ' + ownerName + " Aadhaar Card - " + (isBack ? "Back" : "Front");
+
+        // Dusri side upload hui ho to flip button dikhao
+        const otherSlot = isBack ? owner : owner + "Back";
+        const flip = document.getElementById("aadhaarModalFlip");
+        if (aadhaarImages[otherSlot]) {
+            flip.style.display = "inline-flex";
+            flip.innerHTML = '<i class="fas fa-rotate"></i> View ' + (isBack ? "Front" : "Back");
+            flip.onclick = function () { openAadhaarModal(otherSlot); };
+        } else {
+            flip.style.display = "none";
+        }
         document.getElementById("aadhaarModalImg").src = url;
         document.getElementById("aadhaarModalOpen").href = url;
         document.getElementById("aadhaarModal").classList.add("open");
@@ -655,10 +684,15 @@
         // Aadhaar card images (Cloudinary)
         aadhaarImages.father = f.aadhaarImage?.url || "";
         aadhaarImages.mother = m.aadhaarImage?.url || "";
+        aadhaarImages.fatherBack = f.aadhaarBackImage?.url || "";
+        aadhaarImages.motherBack = m.aadhaarBackImage?.url || "";
 
-        const aadhaarCell = (who) => aadhaarImages[who]
-            ? `<button type="button" class="btn-view-aadhaar" onclick="openAadhaarModal('${who}')"><img src="${aadhaarImages[who]}" alt=""> View Aadhaar</button>`
-            : `<span class="value">Not uploaded</span>`;
+        const aadhaarBtn = (slot, label) => aadhaarImages[slot]
+            ? `<button type="button" class="btn-view-aadhaar" onclick="openAadhaarModal('${slot}')"><img src="${aadhaarImages[slot]}" alt=""> ${label}</button>`
+            : `<span class="value">${label}: Not uploaded</span>`;
+
+        const aadhaarCell = (who) =>
+            `<span style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">${aadhaarBtn(who, 'Front')}${aadhaarBtn(who + 'Back', 'Back')}</span>`;
 
         html += `
             <div class="section">
@@ -715,6 +749,7 @@
         // ========== DOCUMENTS ==========
         const docs = student.documents || {};
         aadhaarImages.student = docs.aadhaarImage?.url || "";
+        aadhaarImages.studentBack = docs.aadhaarBackImage?.url || "";
         html += `
             <div class="section">
                 <div class="section-title"><i class="fas fa-file-alt"></i> Documents</div>
