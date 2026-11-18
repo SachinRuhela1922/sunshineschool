@@ -2,10 +2,17 @@
 <html lang="en">
 
 <head>
+<script>
+    // AUTH GUARD — Student login required
+    if (!localStorage.getItem("loggedInStudent")) {
+      window.location.replace("index.html");
+    }
+  </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Sunshine · Student Profile</title>
+    <title>Sunshine Junior High School · Student Profile</title>
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">

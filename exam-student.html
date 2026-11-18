@@ -2,6 +2,13 @@
 <html lang="en">
 
 <head>
+<script>
+    // AUTH GUARD — Admin login required
+    if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
+      window.location.replace("index.html");
+    }
+  </script>
+
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-<title>Sunshine · Exam Marks</title>
+<title>Sunshine Junior High School · Exam Marks</title>
 
 <!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
