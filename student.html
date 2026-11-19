@@ -1,16 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-    // AUTH GUARD — Admin login required
-    if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
-      window.location.replace("index.html");
-    }
-  </script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sunshine Junior High School · Add Student</title>
+    <title>Sunshine · Add Student</title>
     <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -617,7 +610,7 @@
                             <span class="aadhaar-status" id="fatherAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="fatherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -629,7 +622,7 @@
                             <span class="aadhaar-status" id="fatherBackAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="fatherBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -641,7 +634,7 @@
                             <span class="aadhaar-status" id="motherAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="motherAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -653,7 +646,7 @@
                             <span class="aadhaar-status" id="motherBackAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="motherBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
             </div>
@@ -721,7 +714,7 @@
                             <span class="aadhaar-status" id="studentAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="studentAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -733,7 +726,7 @@
                             <span class="aadhaar-status" id="studentBackAadhaarStatus"></span>
                             <button type="button" class="aadhaar-remove" id="studentBackAadhaarRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
                         </div>
-                        <span class="aadhaar-note">JPG / PNG / WEBP · max 5 MB</span>
+                        <span class="aadhaar-note">JPG / PNG / WEBP · any size (large photos are auto-compressed)</span>
                     </div>
                 </div>
             </div>
@@ -1020,6 +1013,50 @@
         }
     }
 
+    // Badi image ko upload se pehle browser me hi chhota (compress) kar deta hai,
+    // taaki kitne bhi MB ki photo ho, Cloudinary par upload ho jaye.
+    // (Cloudinary free plan me 10 MB se badi image allow nahi hoti.)
+    const AADHAAR_TARGET_BYTES = 6 * 1024 * 1024;
+    const AADHAAR_MAX_SIDE = 2400;
+
+    async function prepareAadhaarFile(file) {
+        if (file.size <= AADHAAR_TARGET_BYTES) return file;
+
+        let bitmap;
+        try {
+            bitmap = await createImageBitmap(file);
+        } catch (e) {
+            return file;
+        }
+
+        let scale = Math.min(1, AADHAAR_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        let quality = 0.88;
+        let blob = null;
+
+        for (let attempt = 0; attempt < 6; attempt++) {
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+            blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+
+            if (blob && blob.size <= AADHAAR_TARGET_BYTES) break;
+
+            scale *= 0.8;
+            quality = Math.max(0.6, quality - 0.08);
+        }
+
+        if (bitmap.close) bitmap.close();
+        if (!blob) return file;
+
+        return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+    }
+
     function setupAadhaarUploader(who) {
         const input = document.getElementById(who + "AadhaarFile");
 
@@ -1043,18 +1080,15 @@
                 return;
             }
 
-            if (file.size > 5 * 1024 * 1024) {
-                restorePrevious("Image must be smaller than 5 MB.");
-                return;
-            }
-
             const localUrl = URL.createObjectURL(file);
             paintAadhaar(who, localUrl, "Uploading...", "", false);
             aadhaarUploading++;
 
             try {
+                const uploadFile = await prepareAadhaarFile(file);
+
                 const formData = new FormData();
-                formData.append("aadhaar", file);
+                formData.append("aadhaar", uploadFile, uploadFile.name);
 
                 const response = await fetch(AADHAAR_UPLOAD_URL, {
                     method: "POST",
