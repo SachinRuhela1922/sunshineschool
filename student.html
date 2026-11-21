@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
+    <script>
+    // AUTH GUARD — Admin login required
+    if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
+      window.location.replace("index.html");
+    }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sunshine · Add Student</title>
@@ -762,7 +770,7 @@
 
     async function loadClasses() {
     try {
-        const response = await fetch("https://sunshine-vtal.onrender.com/api/classes");
+        const response = await fetch(API_BASE_URL + "/api/classes");
         const data = await response.json();
 
         const select = document.getElementById("classSelect");
@@ -963,7 +971,7 @@
     // Image choose karte hi server par upload hoti hai,
     // aur form save hone par uska URL student ke saath save hota hai.
     // ==========================================
-    const AADHAAR_UPLOAD_URL = "https://sunshine-vtal.onrender.com/api/upload/aadhaar";
+    const AADHAAR_UPLOAD_URL = API_BASE_URL + "/api/upload/aadhaar";
     const aadhaarState = { father: null, fatherBack: null, mother: null, motherBack: null, student: null, studentBack: null };
     let aadhaarUploading = 0;
 
@@ -1231,7 +1239,7 @@
         };
 
         try {
-            const response = await fetch("https://sunshine-vtal.onrender.com/api/students", {
+            const response = await fetch(API_BASE_URL + "/api/students", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(student)

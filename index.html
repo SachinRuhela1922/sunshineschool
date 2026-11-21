@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sunshine Junior High School · Login</title>
@@ -269,7 +271,7 @@
 
 <script>
 
-const API = "https://sunshine-vtal.onrender.com"; // Change this to your actual API URL
+const API = API_BASE_URL; // URL config.js me set hai
 
 const loginForm =
   document.getElementById("loginForm");
@@ -376,18 +378,62 @@ loginForm.addEventListener(
        ADMIN
     ========================= */
 
-    if (
-      selectedRole === "admin" &&
-      enteredPassword === "Manshi@1995"
-    ) {
+    // Pichle login ka token hata do
+    sessionStorage.removeItem("authToken");
+    localStorage.removeItem("authToken");
 
-      sessionStorage.setItem(
-        "isAdminLoggedIn",
-        "true"
-      );
+    if (selectedRole === "admin") {
 
-      window.location.href =
-        "admin.html";
+      // Admin password ab server par check hota hai (HTML me nahi)
+      try {
+
+        const response =
+          await fetch(
+            `${API}/api/admin/login`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+              body: JSON.stringify({
+                password:
+                  enteredPassword
+              })
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok || !result.token) {
+          throw new Error(
+            result.message ||
+            "Invalid admin password."
+          );
+        }
+
+        sessionStorage.setItem(
+          "authToken",
+          result.token
+        );
+
+        sessionStorage.setItem(
+          "isAdminLoggedIn",
+          "true"
+        );
+
+        window.location.href =
+          "admin.html";
+
+      } catch (error) {
+
+        showError(
+          error.message ||
+          "Unable to connect with server."
+        );
+
+      }
 
       return;
     }
@@ -433,6 +479,11 @@ loginForm.addEventListener(
 
         }
 
+
+        localStorage.setItem(
+          "authToken",
+          result.token
+        );
 
         localStorage.setItem(
           "loggedInTeacher",
@@ -518,6 +569,11 @@ loginForm.addEventListener(
         */
 
         localStorage.setItem(
+          "authToken",
+          result.token
+        );
+
+        localStorage.setItem(
           "loggedInStudent",
           JSON.stringify(
             result.student
@@ -562,8 +618,12 @@ loginForm.addEventListener(
 
 function showError(message) {
 
+  // Message ko text ki tarah dikhao (HTML nahi) - XSS se bachav
   errorMessage.innerHTML =
-    `<i class="fas fa-circle-exclamation"></i> ${message}`;
+    '<i class="fas fa-circle-exclamation"></i> ';
+  errorMessage.appendChild(
+    document.createTextNode(String(message))
+  );
 
   errorMessage.style.display =
     "block";

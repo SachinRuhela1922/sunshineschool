@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Teacher login required
     if (!localStorage.getItem("loggedInTeacher")) {
@@ -1284,8 +1286,8 @@
     </div>
 
     <script>
-        const API_URL = "https://sunshine-vtal.onrender.com/api/exam-marks";
-const STUDENTS_API_URL = "https://sunshine-vtal.onrender.com/api/students";
+        const API_URL = API_BASE_URL + "/api/exam-marks";
+const STUDENTS_API_URL = API_BASE_URL + "/api/students";
 
         let allExamMarks = [];
         let selectedClass = "";

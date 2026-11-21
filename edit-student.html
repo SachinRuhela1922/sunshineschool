@@ -2,6 +2,14 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
+    <script>
+    // AUTH GUARD — Admin login required
+    if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
+      window.location.replace("index.html");
+    }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sunshine · Edit Student</title>
@@ -904,7 +912,7 @@
 
     async function loadClasses() {
         try {
-            const response = await fetch("https://sunshine-vtal.onrender.com/api/classes");
+            const response = await fetch(API_BASE_URL + "/api/classes");
             const data = await response.json();
 
             const select = document.getElementById("className");
@@ -929,7 +937,7 @@
 
     async function loadStudent() {
         try {
-            const response = await fetch(`https://sunshine-vtal.onrender.com/api/students/${studentId}`);
+            const response = await fetch(`${API_BASE_URL}/api/students/${studentId}`);
             const result = await response.json();
 
             if (!response.ok) {
@@ -1019,7 +1027,7 @@
     // Image choose karte hi server par upload hoti hai,
     // aur form save hone par uska URL student ke saath save hota hai.
     // ==========================================
-    const AADHAAR_UPLOAD_URL = "https://sunshine-vtal.onrender.com/api/upload/aadhaar";
+    const AADHAAR_UPLOAD_URL = API_BASE_URL + "/api/upload/aadhaar";
     const aadhaarState = { father: null, fatherBack: null, mother: null, motherBack: null, student: null, studentBack: null };
     let aadhaarUploading = 0;
 
@@ -1290,7 +1298,7 @@
             message.textContent = "⏳ Saving changes...";
             message.className = "message show info";
 
-            const response = await fetch(`https://sunshine-vtal.onrender.com/api/students/${studentId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/students/${studentId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(updatedStudent)

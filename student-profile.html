@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Student login required
     if (!localStorage.getItem("loggedInStudent")) {
@@ -1065,7 +1067,7 @@
 
 <script>
 
-const API = "https://sunshine-vtal.onrender.com";
+const API = API_BASE_URL;
 
 const studentJSON = localStorage.getItem("loggedInStudent");
 

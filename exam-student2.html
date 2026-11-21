@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Teacher login required
     if (!localStorage.getItem("loggedInTeacher")) {
@@ -1426,7 +1428,7 @@ td input:focus {
 // API AND INITIALIZATION
 // ==========================================
 
-const API = "https://sunshine-vtal.onrender.com";
+const API = API_BASE_URL;
 
 const params = new URLSearchParams(window.location.search);
 

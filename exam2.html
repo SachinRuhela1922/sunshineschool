@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Teacher login required
     if (!localStorage.getItem("loggedInTeacher")) {
@@ -756,7 +758,7 @@ body {
 // ALL LOGIC REMAINS EXACTLY THE SAME
 // ==========================================
 
-const API = "https://sunshine-vtal.onrender.com";
+const API = API_BASE_URL;
 
 let selectedExam = "";
 

@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Admin login required
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -508,7 +510,7 @@
 </div>
 
 <script>
-    const API_URL = "https://sunshine-vtal.onrender.com";
+    const API_URL = API_BASE_URL;
     const container = document.getElementById("teacherContainer");
     const teacherCountEl = document.getElementById("teacherCount");
     const searchInput = document.getElementById("searchInput");

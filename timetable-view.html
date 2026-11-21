@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Admin login required
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -130,7 +132,7 @@ tr:hover td{background:#fcf9f4}
 </div>
 
 <script>
-const API = "https://sunshine-vtal.onrender.com";
+const API = API_BASE_URL;
 const TOTAL_CLASSES = 10;
 let currentTimetable = null;
 

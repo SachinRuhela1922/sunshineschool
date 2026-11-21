@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Admin login required
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -1413,7 +1415,7 @@
   <script>
 
     const API_URL =
-      "https://sunshine-vtal.onrender.com"; // Change this to your actual API URL
+      API_BASE_URL; // URL config.js me set hai
 
 
     /* DATE */

@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <script src="config.js"></script>
+    <script src="api-auth.js"></script>
 <script>
     // AUTH GUARD — Admin login required
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -797,7 +799,7 @@
         // ==========================================
         // CONFIG
         // ==========================================
-        const API_BASE = "https://sunshine-vtal.onrender.com"; // Change this to your server's base URL
+        const API_BASE = API_BASE_URL; // URL config.js me set hai
 
         const dateInput = document.getElementById("attendanceDate");
         const fetchBtn = document.getElementById("fetchBtn");
