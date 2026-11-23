@@ -1641,8 +1641,24 @@ td .absent-btn {
         </span>
     </div>
 
+    <!-- ===== STUDENT SEARCH ===== -->
+    <div class="admit-search-bar">
+        <div class="admit-search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="studentSearchInput"
+                   placeholder="Search student: name, ID, roll no, admission no, father, phone..."
+                   oninput="filterStudentCards()" autocomplete="off">
+            <button type="button" class="clear-search" id="clearStudentSearchBtn" onclick="clearStudentSearch()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <span class="admit-search-count" id="studentSearchCount">0 students</span>
+    </div>
+    <div class="admit-no-result" id="studentNoResult">
+        <i class="fas fa-user-slash"></i> No student found for this search.
+    </div>
+
     <!-- ===== STUDENTS ===== -->
-    <div id="studentsContainer">
         <div class="loading">
             <i class="fas fa-circle-notch"></i>
             <p>Loading students...</p>
@@ -1983,9 +1999,53 @@ function renderStudents() {
         return;
     }
 
-    container.innerHTML = students.map((student, index) => 
+    container.innerHTML = students.map((student, index) =>
         createStudentCard(student, index)
     ).join("");
+
+    filterStudentCards();
+}
+
+// ==========================================
+// STUDENT SEARCH
+// ==========================================
+
+function filterStudentCards() {
+    const input = document.getElementById("studentSearchInput");
+    const query = (input.value || "").trim().toLowerCase();
+    document.getElementById("clearStudentSearchBtn").classList.toggle("show", query.length > 0);
+
+    let visible = 0;
+    students.forEach((student, index) => {
+        const card = document.getElementById(`student-${index}`);
+        if (!card) return;
+        const haystack = [
+            student.studentName,
+            student.studentId,
+            student.rollNumber,
+            student.admissionNumber,
+            student.fatherName,
+            student.father?.name,
+            student.mother?.name,
+            getStudentPhone(student)
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        const match = !query || haystack.includes(query);
+        card.style.display = match ? "" : "none";
+        if (match) visible++;
+    });
+
+    document.getElementById("studentSearchCount").textContent = query
+        ? `${visible} of ${students.length} students`
+        : `${students.length} students`;
+    document.getElementById("studentNoResult").style.display =
+        (query && visible === 0 && students.length) ? "block" : "none";
+}
+
+function clearStudentSearch() {
+    document.getElementById("studentSearchInput").value = "";
+    filterStudentCards();
+    document.getElementById("studentSearchInput").focus();
 }
 
 function updateSubjectNameInState(studentIndex, rowNum, newSubjectName) {
