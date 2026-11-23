@@ -4,6 +4,7 @@
 <head>
     <script src="config.js"></script>
     <script src="api-auth.js"></script>
+    <script src="subject-order.js"></script>
 <script>
     // AUTH GUARD — Admin login required
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -1557,6 +1558,33 @@ td .absent-btn {
     }
 }
 
+/* ===== SUBJECT ORDER (move up/down + drag) ===== */
+.order-cell { width: 64px; white-space: nowrap; text-align: center; }
+.order-tools { display: inline-flex; align-items: center; gap: 2px; }
+.drag-handle {
+    cursor: grab; color: #b09a7e; font-size: 15px; padding: 6px 4px;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.drag-handle:active { cursor: grabbing; color: #f58a2e; }
+.order-btn {
+    border: none; background: #fcf3e8; color: #7f6a4b; width: 24px; height: 22px;
+    border-radius: 6px; cursor: pointer; font-size: 11px; padding: 0; line-height: 22px;
+}
+.order-btn:hover:not(:disabled) { background: #f58a2e; color: #fff; }
+.order-btn:disabled { opacity: 0.3; cursor: default; }
+.order-btn-col { display: inline-flex; flex-direction: column; gap: 2px; }
+tr.subject-dragging { opacity: 0.45; }
+tr.subject-drop-target td { box-shadow: inset 0 3px 0 #f58a2e; }
+tr.subject-group-start td { border-top: 2px solid #f0e2d2; }
+.save-order-btn {
+    border: none; background: #2e9e5b; color: #fff; padding: 9px 14px; border-radius: 10px;
+    font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    animation: orderPulse 1.6s ease-in-out infinite;
+}
+.save-order-btn:disabled { opacity: 0.6; animation: none; cursor: default; }
+@keyframes orderPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(46,158,91,.45); } 50% { box-shadow: 0 0 0 6px rgba(46,158,91,0); } }
+.order-hint { font-size: 12px; color: #8f7a5d; margin: 6px 0 0; }
+
 </style>
 
 </head>
@@ -1758,6 +1786,9 @@ document.getElementById("pageTitle").textContent = `${exam || 'Exam'} Marks Entr
 let students = [];
 let existingMarks = [];
 let studentSubjects = {}; // Will store subject list for each student
+let subjectDrafts = {};        // Re-render se pehle typed (unsaved) marks yahan bach ke rehte hain
+let subjectOrderDirty = false; // Order badla par server par save nahi hua
+let subjectDragInfo = null;
 let currentAdmitCardData = [];
 let currentStudentGroups = [];
 
@@ -1966,13 +1997,19 @@ async function loadStudents() {
             }
         }
 
+        // Same subject (Hindi(O), Hindi(W)) hamesha ek saath
+        commonSubjects = SubjectOrder.groupSubjectsByBase(commonSubjects);
+
         students.forEach((student, index) => {
             const saved = existingMarks.find(
                 record => String(record.studentMongoId) === String(student._id)
             );
             
             if (saved && saved.marks && saved.marks.length) {
-                studentSubjects[index] = saved.marks.map(m => m.subjectName);
+                studentSubjects[index] = SubjectOrder.applySubjectOrder(
+                    saved.marks.map(m => m.subjectName),
+                    commonSubjects
+                );
             } else if (commonSubjects.length > 0) {
                 studentSubjects[index] = [...commonSubjects];
             } else {
@@ -1999,6 +2036,9 @@ function renderStudents() {
         container.innerHTML = `<div class="error"><i class="fas fa-users-slash"></i> No students found in this class.</div>`;
         return;
     }
+
+    snapshotSubjectDrafts();
+    subjectOrderDirty = computeSubjectOrderDirty(); // saved order alag hai to "Save Subject Order" button dikhega
 
     container.innerHTML = students.map((student, index) =>
         createStudentCard(student, index)
@@ -2138,12 +2178,18 @@ function createStudentCard(student, index) {
                     <i class="fas fa-minus-circle"></i> Remove Subject from All
                 </button>
                 ${subjects.length > 0 ? `<span class="subject-count"><i class="fas fa-book"></i> ${subjects.length} subject${subjects.length !== 1 ? 's' : ''}</span>` : ''}
+                ${subjectOrderDirty ? `
+                <button class="save-order-btn" onclick="saveSubjectOrderForAll(this)">
+                    <i class="fas fa-sort"></i> Save Subject Order for All
+                </button>` : ''}
             </div>
+            ${subjects.length > 1 ? `<p class="order-hint"><i class="fas fa-grip-vertical"></i> Drag <b>&#10303;</b> or use &#9650;&#9660; to change subject order &mdash; it changes for all students.</p>` : ''}
 
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
+                            <th class="order-cell"><i class="fas fa-sort"></i></th>
                             <th style="width:30%;"><i class="fas fa-book-open"></i> Subject Name</th>
                             <th style="width:35%;"><i class="fas fa-arrow-up"></i> Max Marks</th>
                             <th style="width:35%;"><i class="fas fa-arrow-down"></i> Obtained Marks</th>
@@ -2152,9 +2198,42 @@ function createStudentCard(student, index) {
                     <tbody id="marks-body-${index}">
                         ${subjects.map((subjectName, subjectIndex) => {
                             const savedSubject = getSavedSubjectEntry(savedMarks, subjectName, subjectIndex);
+                            // Unsaved typed values (order change / add subject ke baad bhi rahein)
+                            const draft = subjectDrafts[index] ? subjectDrafts[index][subjectName] : undefined;
+                            const isAbsent = draft ? draft.absent : savedSubject?.status === 'ABSENT';
+                            const maxValue = draft ? draft.max : (savedSubject?.maxMarks || "");
+                            const obtainedValue = isAbsent ? "" : (draft ? draft.obtained : (savedSubject?.obtainedMarks ?? ""));
+                            const base = SubjectOrder.subjectBaseName(subjectName);
+                            const prevBase = subjectIndex > 0 ? SubjectOrder.subjectBaseName(subjects[subjectIndex - 1]) : null;
+                            const groupStart = subjectIndex > 0 && (!base || base !== prevBase);
                             // No locking - all fields are editable
                             return `
-                                <tr id="subject-row-${index}-${subjectIndex}">
+                                <tr id="subject-row-${index}-${subjectIndex}"
+                                    class="${groupStart ? 'subject-group-start' : ''}"
+                                    ondragstart="onSubjectDragStart(event, ${index}, ${subjectIndex})"
+                                    ondragover="onSubjectDragOver(event, ${index})"
+                                    ondragleave="onSubjectDragLeave(event)"
+                                    ondrop="onSubjectDrop(event, ${index}, ${subjectIndex})"
+                                    ondragend="onSubjectDragEnd(event)">
+                                    <td class="order-cell">
+                                        <span class="order-tools">
+                                            <span class="drag-handle" title="Drag to reorder"
+                                                onmousedown="this.closest('tr').draggable = true"
+                                                onmouseup="this.closest('tr').draggable = false"
+                                                ontouchstart="onSubjectTouchStart(event, ${index}, ${subjectIndex})"
+                                                ontouchmove="onSubjectTouchMove(event)"
+                                                ontouchend="onSubjectTouchEnd(event)"
+                                                ontouchcancel="onSubjectTouchEnd(event, true)">&#10303;</span>
+                                            <span class="order-btn-col">
+                                                <button type="button" class="order-btn" title="Move up"
+                                                    onclick="stepSubjectForAll(${index}, ${subjectIndex}, -1)"
+                                                    ${subjectIndex === 0 ? 'disabled' : ''}>&#9650;</button>
+                                                <button type="button" class="order-btn" title="Move down"
+                                                    onclick="stepSubjectForAll(${index}, ${subjectIndex}, 1)"
+                                                    ${subjectIndex === subjects.length - 1 ? 'disabled' : ''}>&#9660;</button>
+                                            </span>
+                                        </span>
+                                    </td>
                                     <td>
                                         <input 
                                             type="text" 
@@ -2173,7 +2252,7 @@ function createStudentCard(student, index) {
                                             class="max-mark" 
                                             data-student="${index}" 
                                             data-row="${subjectIndex}"
-                                            value="${savedSubject?.maxMarks || ""}"
+                                            value="${escapeHtml(maxValue)}"
                                             placeholder="Max"
                                         >
                                     </td>
@@ -2185,9 +2264,10 @@ function createStudentCard(student, index) {
                                                 class="obtained-mark" 
                                                 data-student="${index}" 
                                                 data-row="${subjectIndex}"
-                                                value="${savedSubject?.status === 'ABSENT' ? '' : (savedSubject?.obtainedMarks ?? '')}"
+                                                value="${escapeHtml(obtainedValue)}"
                                                 placeholder="Obtained"
-                                                ${savedSubject?.status === 'ABSENT' ? 'disabled' : ''}
+                                                data-absent="${isAbsent ? 'true' : 'false'}"
+                                                ${isAbsent ? 'disabled' : ''}
                                             >
                                             <button
                                                 type="button"
@@ -2195,8 +2275,8 @@ function createStudentCard(student, index) {
                                                 onclick="toggleAbsent(${index}, ${subjectIndex}, this)"
                                                 style="
                                                     border:none;
-                                                    background:${savedSubject?.status === 'ABSENT' ? '#b53b2e' : '#f0e2d2'};
-                                                    color:${savedSubject?.status === 'ABSENT' ? 'white' : '#4d3e2b'};
+                                                    background:${isAbsent ? '#b53b2e' : '#f0e2d2'};
+                                                    color:${isAbsent ? 'white' : '#4d3e2b'};
                                                     padding:7px 10px;
                                                     border-radius:8px;
                                                     cursor:pointer;
@@ -2206,7 +2286,7 @@ function createStudentCard(student, index) {
                                                     min-height:36px;
                                                 "
                                             >
-                                                ${savedSubject?.status === 'ABSENT' ? 'Present' : 'Absent'}
+                                                ${isAbsent ? 'Present' : 'Absent'}
                                             </button>
                                         </div>
                                     </td>
@@ -2259,6 +2339,8 @@ function addSubjectToAllStudents() {
             skippedCount++;
         } else {
             studentSubjects[index].push(trimmedSubject);
+            // Hindi(W) apne aap Hindi(O) ke neeche aayega
+            studentSubjects[index] = SubjectOrder.groupSubjectsByBase(studentSubjects[index]);
             addedCount++;
         }
     });
@@ -2407,6 +2489,228 @@ async function removeSubjectFromAllStudents() {
 
     alert(message);
 }
+
+// ==========================================
+// SUBJECT ORDER (▲▼ buttons + drag & drop)
+// Ek student me order badlo -> sab students me badlega.
+// Logic subject-order.js me hai.
+// ==========================================
+
+// Re-render se pehle har student ke typed (unsaved) marks yaad rakho
+function snapshotSubjectDrafts() {
+    const drafts = {};
+    students.forEach((student, index) => {
+        const body = document.getElementById(`marks-body-${index}`);
+        if (!body) return;
+        const map = {};
+        body.querySelectorAll("tr").forEach(row => {
+            const name = (row.querySelector(".subject-name-input")?.value || "").trim();
+            if (!name) return;
+            const obtained = row.querySelector(".obtained-mark");
+            map[name] = {
+                max: row.querySelector(".max-mark")?.value ?? "",
+                obtained: obtained?.value ?? "",
+                absent: obtained?.dataset.absent === "true"
+            };
+        });
+        drafts[index] = map;
+    });
+    if (Object.keys(drafts).length) subjectDrafts = drafts;
+}
+
+function getSavedRecord(student) {
+    return existingMarks.find(
+        record => String(record.studentMongoId) === String(student._id)
+    );
+}
+
+// Kya kisi saved student ka server wala order screen wale order se alag hai?
+function computeSubjectOrderDirty() {
+    return students.some((student, index) => {
+        const saved = getSavedRecord(student);
+        if (!saved || !saved.marks || !saved.marks.length) return false;
+        const current = saved.marks.map(m => m.subjectName);
+        const wanted = SubjectOrder.orderMarksBySubjects(saved.marks, studentSubjects[index] || [])
+            .map(m => m.subjectName);
+        return !SubjectOrder.sameOrder(current, wanted);
+    });
+}
+
+// Naya order (master) sab students par lagao
+function applySubjectOrderToAll(master) {
+    students.forEach((student, index) => {
+        studentSubjects[index] = SubjectOrder.applySubjectOrder(studentSubjects[index] || [], master);
+    });
+    renderStudents();
+}
+
+function stepSubjectForAll(studentIndex, subjectIndex, direction) {
+    const list = studentSubjects[studentIndex] || [];
+    applySubjectOrderToAll(SubjectOrder.stepSubjectInList(list, subjectIndex, direction));
+}
+
+function moveSubjectForAll(studentIndex, from, to) {
+    const list = studentSubjects[studentIndex] || [];
+    applySubjectOrderToAll(SubjectOrder.moveSubjectInList(list, from, to));
+}
+
+function clearSubjectDropTargets() {
+    document.querySelectorAll("tr.subject-drop-target")
+        .forEach(row => row.classList.remove("subject-drop-target"));
+}
+
+/* ----- Mouse drag (computer) ----- */
+
+function onSubjectDragStart(event, studentIndex, subjectIndex) {
+    const row = event.currentTarget;
+    if (!row.draggable) return; // sirf ⠿ handle se drag
+    subjectDragInfo = { studentIndex, from: subjectIndex };
+    event.dataTransfer.effectAllowed = "move";
+    try { event.dataTransfer.setData("text/plain", String(subjectIndex)); } catch (e) {}
+    row.classList.add("subject-dragging");
+}
+
+function onSubjectDragOver(event, studentIndex) {
+    if (!subjectDragInfo || subjectDragInfo.studentIndex !== studentIndex) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    clearSubjectDropTargets();
+    event.currentTarget.classList.add("subject-drop-target");
+}
+
+function onSubjectDragLeave(event) {
+    event.currentTarget.classList.remove("subject-drop-target");
+}
+
+function onSubjectDrop(event, studentIndex, subjectIndex) {
+    event.preventDefault();
+    const info = subjectDragInfo;
+    subjectDragInfo = null;
+    clearSubjectDropTargets();
+    if (!info || info.studentIndex !== studentIndex || info.from === subjectIndex) return;
+    moveSubjectForAll(studentIndex, info.from, subjectIndex);
+}
+
+function onSubjectDragEnd(event) {
+    event.currentTarget.draggable = false;
+    event.currentTarget.classList.remove("subject-dragging");
+    clearSubjectDropTargets();
+    subjectDragInfo = null;
+}
+
+/* ----- Touch drag (phone / tablet browser) ----- */
+
+let subjectTouch = null;
+
+function onSubjectTouchStart(event, studentIndex, subjectIndex) {
+    subjectTouch = { studentIndex, from: subjectIndex, to: subjectIndex };
+    const row = event.currentTarget.closest("tr");
+    if (row) row.classList.add("subject-dragging");
+}
+
+function onSubjectTouchMove(event) {
+    if (!subjectTouch || !event.touches || !event.touches[0]) return;
+    const touch = event.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const row = el && el.closest(`#marks-body-${subjectTouch.studentIndex} tr`);
+    clearSubjectDropTargets();
+    if (row) {
+        subjectTouch.to = Number(row.id.split("-").pop());
+        row.classList.add("subject-drop-target");
+    }
+}
+
+function onSubjectTouchEnd(event, cancelled) {
+    const info = subjectTouch;
+    subjectTouch = null;
+    clearSubjectDropTargets();
+    document.querySelectorAll("tr.subject-dragging")
+        .forEach(row => row.classList.remove("subject-dragging"));
+    if (!info || cancelled || isNaN(info.to) || info.to === info.from) return;
+    moveSubjectForAll(info.studentIndex, info.from, info.to);
+}
+
+/* ----- Already-saved students ka order server par save karo ----- */
+
+async function saveSubjectOrderForAll(button) {
+    const jobs = [];
+
+    students.forEach((student, index) => {
+        const saved = getSavedRecord(student);
+        if (!saved || !saved.marks || !saved.marks.length) return;
+        const ordered = SubjectOrder.orderMarksBySubjects(saved.marks, studentSubjects[index] || []);
+        if (SubjectOrder.sameOrder(ordered.map(m => m.subjectName), saved.marks.map(m => m.subjectName))) return;
+        jobs.push({
+            student,
+            marks: ordered.map(m => ({
+                subjectName: m.subjectName,
+                maxMarks: m.maxMarks,
+                obtainedMarks: m.obtainedMarks,
+                status: m.status || "PRESENT"
+            }))
+        });
+    });
+
+    if (!jobs.length) {
+        renderStudents();
+        alert("✅ Subject order is already saved for all students.");
+        return;
+    }
+
+    const ok = confirm(
+        `Save the new subject order for ${jobs.length} student(s) whose marks are already saved?\n\n` +
+        `Only the ORDER changes — marks stay the same.`
+    );
+    if (!ok) return;
+
+    document.querySelectorAll(".save-order-btn").forEach(btn => {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving order...';
+    });
+
+    let saved = 0;
+    const failed = [];
+
+    for (const job of jobs) {
+        try {
+            const response = await fetch(`${API}/api/exam-marks`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    exam,
+                    className,
+                    studentMongoId: job.student._id,
+                    marks: job.marks
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && data.success) saved++;
+            else failed.push(job.student.studentName || job.student._id);
+        } catch (e) {
+            failed.push(job.student.studentName || job.student._id);
+        }
+    }
+
+    try {
+        const marksResponse = await fetch(
+            `${API}/api/exam-marks/${encodeURIComponent(exam)}/${encodeURIComponent(className)}`
+        );
+        const marksData = await marksResponse.json();
+        if (marksResponse.ok && marksData.success) {
+            existingMarks = marksData.examMarks || [];
+        }
+    } catch (e) {
+        console.error("Failed to refresh marks after order save:", e);
+    }
+
+    renderStudents();
+
+    alert(
+        `✅ Subject order saved for ${saved} student(s).` +
+        (failed.length ? `\n⚠️ Failed for: ${failed.join(", ")}. Please try again.` : "")
+    );
+}
+
 
 function toggleAbsent(studentIndex, subjectIndex, button) {
     const row = document.querySelector(

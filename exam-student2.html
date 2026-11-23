@@ -4,6 +4,7 @@
 <head>
     <script src="config.js"></script>
     <script src="api-auth.js"></script>
+    <script src="subject-order.js"></script>
 <script>
     // AUTH GUARD — Teacher login required
     if (!localStorage.getItem("loggedInTeacher")) {
@@ -1494,6 +1495,9 @@ async function loadStudents() {
             }
         }
 
+        // Same subject (Hindi(O), Hindi(W)) hamesha ek saath
+        commonSubjects = SubjectOrder.groupSubjectsByBase(commonSubjects);
+
         students.forEach((student, index) => {
             // Check if this student has saved marks
             const saved = existingMarks.find(
@@ -1502,7 +1506,10 @@ async function loadStudents() {
             
             if (saved && saved.marks && saved.marks.length) {
                 // Use the student's own saved subjects
-                studentSubjects[index] = saved.marks.map(m => m.subjectName);
+                studentSubjects[index] = SubjectOrder.applySubjectOrder(
+                    saved.marks.map(m => m.subjectName),
+                    commonSubjects
+                );
             } else if (commonSubjects.length > 0) {
                 // Use common subjects from other students
                 studentSubjects[index] = [...commonSubjects];
@@ -1818,6 +1825,8 @@ function addSubjectToAllStudents() {
             skippedCount++; // isko already hai, skip
         } else {
             studentSubjects[index].push(trimmedSubject);
+            // Hindi(W) apne aap Hindi(O) ke neeche aayega
+            studentSubjects[index] = SubjectOrder.groupSubjectsByBase(studentSubjects[index]);
             addedCount++;
         }
     });
