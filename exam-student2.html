@@ -1606,12 +1606,16 @@ function getSavedSubjectEntry(savedMarks, subjectName, subjectIndex) {
     return savedMarks.find(item => item.subjectName === subjectName);
 }
 
-// SECURITY RULE: once a student has ANY saved marks record, that student
-// is permanently locked — no editing, ever, regardless of whether the
-// obtained marks were 0 or higher. Only students with NO saved record at
-// all (fresh students) can have marks added.
+// SECURITY RULE: teacher sirf EK baar marks save/edit kar sakta hai.
+// - Fresh student (koi record nahi)        -> teacher add kar sakta hai (1 baar)
+// - Admin ne save kiye, teacher ne nahi    -> teacher 1 baar edit kar sakta hai
+// - Teacher ek baar save/edit kar chuka    -> permanently locked
+// (record.teacherEdited server set karta hai, wahi final check bhi karta hai)
+function isTeacherLocked(record) {
+    return !!(record && record.teacherEdited);
+}
 function isRowLocked(savedSubject) {
-    return !!savedSubject;
+    return false; // per-row lock nahi, poora student lock hota hai (isTeacherLocked)
 }
 
 function createStudentCard(student, index) {
@@ -1623,9 +1627,10 @@ function createStudentCard(student, index) {
     const savedMarks = saved?.marks || [];
     const initials = (student.studentName || 'S').charAt(0).toUpperCase();
 
-    // A saved record (even with all-zero marks) permanently locks the
-    // whole student. No partial / per-row editing after first save.
-    const hasExistingRecord = !!(saved && saved.marks && saved.marks.length);
+    // Lock tabhi jab teacher apna ek edit use kar chuka ho.
+    // Admin ke save kiye marks teacher ek baar edit kar sakta hai.
+    const hasExistingRecord = isTeacherLocked(saved);
+    const canEditOnce = !!(saved && saved.marks && saved.marks.length) && !hasExistingRecord;
 
     const rowLockFlags = subjects.map((subjectName, subjectIndex) => {
         const savedSubject = getSavedSubjectEntry(savedMarks, subjectName, subjectIndex);
@@ -1744,12 +1749,14 @@ function createStudentCard(student, index) {
         value="${savedSubject?.status === 'ABSENT' ? '' : (savedSubject?.obtainedMarks ?? '')}"
         placeholder="Obtained"
         ${savedSubject?.status === 'ABSENT' ? 'disabled' : ''}
+        ${isReadonly ? 'readonly' : ''}
     >
 
     <button
         type="button"
         class="absent-btn"
         onclick="toggleAbsent(${index}, ${subjectIndex}, this)"
+        ${isReadonly ? 'disabled' : ''}
         style="
             border:none;
             background:${savedSubject?.status === 'ABSENT' ? '#b53b2e' : '#f0e2d2'};
@@ -1786,6 +1793,12 @@ function createStudentCard(student, index) {
                         <i class="fas fa-hourglass-half"></i> ⏳ ${lockedCount} of ${subjects.length} subject(s) locked ·
                         remaining subjects are still editable
                     </span>
+                ` : canEditOnce ? `
+                    <span class="partial">
+                        <i class="fas fa-pen"></i> ✏️ Marks saved by Admin ·
+                        Total: ${saved.totalObtainedMarks} / ${saved.totalMaxMarks} · ${saved.percentage}% ·
+                        You can edit these marks ONE time only.
+                    </span>
                 ` : `
                     <span><i class="fas fa-clock"></i> ⏳ Marks not saved yet.</span>
                 `}
@@ -1794,7 +1807,9 @@ function createStudentCard(student, index) {
             <button class="save-btn" onclick="saveMarks(${index})" ${isFullyLocked ? 'disabled' : ''}>
                 ${isFullyLocked
                     ? '<i class="fas fa-lock"></i> 🔒 Marks Locked (Cannot Edit)'
-                    : (hasAnyLocked
+                    : (canEditOnce
+                        ? '<i class="fas fa-pen"></i> ✏️ Edit ' + escapeHtml(exam) + ' Marks (One Time)'
+                        : hasAnyLocked
                         ? '<i class="fas fa-save"></i> 💾 Update Remaining ' + escapeHtml(exam) + ' Marks'
                         : '<i class="fas fa-save"></i> 💾 Save ' + escapeHtml(exam) + ' Marks')}
             </button>
@@ -1878,9 +1893,9 @@ function toggleAbsent(studentIndex, subjectIndex, button) {
     }
 }
 // ==========================================
-// SAVE MARKS - PERMANENTLY LOCKS THE STUDENT ONCE SAVED
-// Fresh students (no existing record) can be saved once. After that,
-// no further edits are allowed — not even for 0/blank marks.
+// SAVE MARKS - TEACHER KA EK HI SAVE/EDIT
+// Fresh student ya admin ke save kiye marks -> teacher 1 baar save kar sakta
+// hai. Uske baad record permanently lock ho jaata hai (teacherEdited).
 // ==========================================
 
 async function saveMarks(index) {
@@ -1891,8 +1906,8 @@ async function saveMarks(index) {
     const alreadySaved = existingMarks.find(
         record => String(record.studentMongoId) === String(student._id)
     );
-    if (alreadySaved && alreadySaved.marks && alreadySaved.marks.length) {
-        alert("⚠️ Marks for this student are already saved and permanently locked. Editing is not allowed.");
+    if (isTeacherLocked(alreadySaved)) {
+        alert("⚠️ You have already saved/edited marks for this student once. Further editing is not allowed.");
         renderStudents();
         return;
     }
@@ -1991,7 +2006,7 @@ async function saveMarks(index) {
     }
 
     const confirmSubmit = confirm(
-        `⚠️ Once saved, marks for ${student.studentName} CANNOT be edited again — ever, ` +
+        `⚠️ You can save/edit marks only ONE time. After this, marks for ${student.studentName} CANNOT be edited again — ever, ` +
         `even if a subject is left at 0 or blank.\n` +
         `Please double-check every value before continuing.\n\n` +
         `Do you want to save?`
