@@ -1608,8 +1608,8 @@ function getSavedSubjectEntry(savedMarks, subjectName, subjectIndex) {
 
 // SECURITY RULE: teacher sirf EK baar marks save/edit kar sakta hai.
 // - Fresh student (koi record nahi)        -> teacher add kar sakta hai (1 baar)
-// - Admin ne save kiye, teacher ne nahi    -> teacher 1 baar edit kar sakta hai
-// - Teacher ek baar save/edit kar chuka    -> permanently locked
+// - Admin ya teacher ne save kiye          -> locked (teacher edit nahi kar sakta)
+// - Admin ne unlock kiya                   -> teacher 1 baar edit, fir dobara lock
 // (record.teacherEdited server set karta hai, wahi final check bhi karta hai)
 function isTeacherLocked(record) {
     return !!(record && record.teacherEdited);
@@ -1627,8 +1627,8 @@ function createStudentCard(student, index) {
     const savedMarks = saved?.marks || [];
     const initials = (student.studentName || 'S').charAt(0).toUpperCase();
 
-    // Lock tabhi jab teacher apna ek edit use kar chuka ho.
-    // Admin ke save kiye marks teacher ek baar edit kar sakta hai.
+    // Teacher/admin ke save ke baad lock. Admin unlock kare to teacher
+    // ek baar edit kar sakta hai.
     const hasExistingRecord = isTeacherLocked(saved);
     const canEditOnce = !!(saved && saved.marks && saved.marks.length) && !hasExistingRecord;
 
@@ -1795,9 +1795,9 @@ function createStudentCard(student, index) {
                     </span>
                 ` : canEditOnce ? `
                     <span class="partial">
-                        <i class="fas fa-pen"></i> ✏️ Marks saved by Admin ·
+                        <i class="fas fa-lock-open"></i> 🔓 Unlocked by Admin ·
                         Total: ${saved.totalObtainedMarks} / ${saved.totalMaxMarks} · ${saved.percentage}% ·
-                        You can edit these marks ONE time only.
+                        You can edit these marks ONE time only, then they lock again.
                     </span>
                 ` : `
                     <span><i class="fas fa-clock"></i> ⏳ Marks not saved yet.</span>
@@ -1806,7 +1806,7 @@ function createStudentCard(student, index) {
 
             <button class="save-btn" onclick="saveMarks(${index})" ${isFullyLocked ? 'disabled' : ''}>
                 ${isFullyLocked
-                    ? '<i class="fas fa-lock"></i> 🔒 Marks Locked (Cannot Edit)'
+                    ? '<i class="fas fa-lock"></i> 🔒 Marks Locked (Ask Admin to Unlock)'
                     : (canEditOnce
                         ? '<i class="fas fa-pen"></i> ✏️ Edit ' + escapeHtml(exam) + ' Marks (One Time)'
                         : hasAnyLocked
@@ -1907,7 +1907,7 @@ async function saveMarks(index) {
         record => String(record.studentMongoId) === String(student._id)
     );
     if (isTeacherLocked(alreadySaved)) {
-        alert("⚠️ You have already saved/edited marks for this student once. Further editing is not allowed.");
+        alert("⚠️ Marks for this student are locked. Ask admin to unlock them for editing.");
         renderStudents();
         return;
     }
@@ -2050,7 +2050,7 @@ async function saveMarks(index) {
         // Re-render to show updated lock state
         renderStudents();
 
-        alert(`✅ Marks for ${student.studentName} saved and permanently locked.`);
+        alert(`✅ Marks for ${student.studentName} saved and locked. Ask admin to unlock if any change is needed.`);
 
     } catch (error) {
         console.error(error);

@@ -273,6 +273,22 @@ body {
     box-shadow: 0 6px 20px rgba(181, 59, 46, 0.3);
 }
 
+.btn-unlock-all {
+    background: linear-gradient(135deg, #2b7a3a, #3fa055);
+    color: white;
+    box-shadow: 0 4px 12px rgba(43, 122, 58, 0.2);
+}
+
+.btn-unlock-all:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(43, 122, 58, 0.3);
+}
+
+.btn-unlock-all:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* ===== SECTION HEADER ===== */
 .section-header {
     display: flex;
@@ -594,6 +610,29 @@ td input[readonly] {
 .status .locked {
     color: #b53b2e;
 }
+
+.status .lock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.lock-toggle-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+}
+
+.lock-toggle-btn.unlock { background: #2b7a3a; }
+.lock-toggle-btn.lock { background: #b53b2e; }
+.lock-toggle-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .status i {
     margin-right: 0.4rem;
@@ -1649,6 +1688,10 @@ tr.subject-group-start td { border-top: 2px solid #f0e2d2; }
             <button class="btn-action-primary btn-remove-subject-all" onclick="removeSubjectFromAllStudents()">
                 <i class="fas fa-minus-circle"></i> Remove Subject from All
             </button>
+
+            <button class="btn-action-primary btn-unlock-all" onclick="unlockAllMarks(this)">
+                <i class="fas fa-lock-open"></i> Unlock All for Teacher
+            </button>
         </div>
         <div class="action-group">
             <span class="action-label">
@@ -2307,6 +2350,21 @@ function createStudentCard(student, index) {
                 ` : `
                     <span><i class="fas fa-clock"></i> ⏳ Marks not saved yet.</span>
                 `}
+                ${saved ? (saved.teacherEdited ? `
+                    <div class="lock-row">
+                        <span class="locked"><i class="fas fa-lock"></i> Locked for teacher</span>
+                        <button type="button" class="lock-toggle-btn unlock" onclick="setStudentLock(${index}, false, this)">
+                            <i class="fas fa-lock-open"></i> Unlock for Teacher
+                        </button>
+                    </div>
+                ` : `
+                    <div class="lock-row">
+                        <span class="partial"><i class="fas fa-lock-open"></i> Unlocked — teacher can edit once</span>
+                        <button type="button" class="lock-toggle-btn lock" onclick="setStudentLock(${index}, true, this)">
+                            <i class="fas fa-lock"></i> Lock
+                        </button>
+                    </div>
+                `) : ''}
             </div>
 
             <button class="save-btn" onclick="saveMarks(${index})">
@@ -2443,7 +2501,8 @@ async function removeSubjectFromAllStudents() {
                         exam,
                         className,
                         studentMongoId: student._id,
-                        marks: updatedMarks
+                        marks: updatedMarks,
+                        keepLock: true
                     })
                 });
 
@@ -2680,7 +2739,8 @@ async function saveSubjectOrderForAll(button) {
                     exam,
                     className,
                     studentMongoId: job.student._id,
-                    marks: job.marks
+                    marks: job.marks,
+                    keepLock: true
                 })
             });
             const data = await response.json().catch(() => ({}));
@@ -2810,8 +2870,8 @@ async function saveMarks(index) {
         return;
     }
 
-    // Confirm save (no lock warning since we removed locking)
-    const confirmSubmit = confirm(`Save marks for ${student.studentName}?`);
+    // Admin ke save ke baad marks teacher ke liye lock ho jaate hain
+    const confirmSubmit = confirm(`Save marks for ${student.studentName}?\n\nSaving will LOCK these marks for the teacher (you can unlock them anytime).`);
     if (!confirmSubmit) return;
     
     // Update stored subjects
@@ -2854,6 +2914,92 @@ async function saveMarks(index) {
     } catch (error) {
         console.error(error);
         alert("Error: " + error.message);
+    }
+}
+
+// ==========================================
+// TEACHER LOCK / UNLOCK (ADMIN)
+// Admin ya teacher ke save ke baad record teacher ke liye lock ho jaata hai.
+// Unlock ke baad teacher ek baar edit kar sakta hai, fir auto-lock.
+// ==========================================
+
+async function refreshExistingMarks() {
+    const marksResponse = await fetch(
+        `${API}/api/exam-marks/${encodeURIComponent(exam)}/${encodeURIComponent(className)}`
+    );
+    const marksData = await marksResponse.json();
+    if (marksResponse.ok && marksData.success) {
+        existingMarks = marksData.examMarks || [];
+    }
+}
+
+async function setStudentLock(index, lock, button) {
+    const student = students[index];
+    const saved = getSavedRecord(student);
+    if (!saved || !saved._id) {
+        alert("Marks not saved yet for this student.");
+        return;
+    }
+
+    const name = student.studentName || "this student";
+    const msg = lock
+        ? `Lock marks of ${name}? Teacher will not be able to edit them.`
+        : `Unlock marks of ${name}? Teacher will be able to edit them ONCE, after that they lock again.`;
+    if (!confirm(msg)) return;
+
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetch(`${API}/api/exam-marks/${encodeURIComponent(saved._id)}/${lock ? "lock" : "unlock"}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Unable to change lock.");
+        }
+
+        await refreshExistingMarks();
+        renderStudents();
+    } catch (error) {
+        console.error(error);
+        alert("Error: " + error.message);
+        if (button) button.disabled = false;
+    }
+}
+
+async function unlockAllMarks(button) {
+    const lockedCount = existingMarks.filter(r => r.teacherEdited).length;
+    if (!lockedCount) {
+        alert("No locked marks found for this exam and class.");
+        return;
+    }
+
+    if (!confirm(`Unlock marks of ALL ${lockedCount} locked student(s) in ${className} (${exam})?\n\nTeacher will be able to edit each student ONCE, after that they lock again.`)) {
+        return;
+    }
+
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetch(`${API}/api/exam-marks/unlock-all`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ exam, className })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Unable to unlock marks.");
+        }
+
+        await refreshExistingMarks();
+        renderStudents();
+        alert(`🔓 ${data.message}`);
+    } catch (error) {
+        console.error(error);
+        alert("Error: " + error.message);
+    } finally {
+        if (button) button.disabled = false;
     }
 }
 
